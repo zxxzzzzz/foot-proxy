@@ -240,6 +240,7 @@ const handleStatic = async (req, response) => {
         ['.mp3', 'audio/mpeg;'],
         ['.jpg', 'image/jpeg;'],
         ['.png', 'image/png;'],
+        ['.ico', 'image/x-icon'],
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item[0]));
     if (!matchedItem) {
