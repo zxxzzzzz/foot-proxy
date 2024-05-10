@@ -19,13 +19,12 @@ const DOMAIN = 'http://175.27.166.226';
 export const handleLogin = async (request: Request, response: Response) => {
   const fullUrl = DOMAIN + request.rawPath;
   if (!fullUrl.endsWith('/api/users/login')) return true;
-  const body = JSON.parse(request.body);
   let ossRes: any = void 0;
   try {
     ossRes = await client.get('sync.json');
   } catch (error) {}
   const syncData = JSON.parse(ossRes?.content || '{}');
-  const loginData = JSON.parse(body || '{}') as { account: string; password: string };
+  const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
   const loginResponse = syncData?.loginResponse as { headers: { 'Set-Cookie': string[]; Date: string }; body: string };
   const accountList = (syncData?.accountList || []) as { account: string; password: string; timestamp: number }[];
   const loginRes = await fetch(fullUrl, {
@@ -38,7 +37,7 @@ export const handleLogin = async (request: Request, response: Response) => {
       Referer: 'http://175.27.166.226/',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
     },
-    body: body,
+    body: request.body,
     method: 'POST',
   });
   response.headers['Content-Type'] = 'application/json; charset=utf-8';

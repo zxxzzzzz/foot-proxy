@@ -20,14 +20,13 @@ const handleLogin = async (request, response) => {
     const fullUrl = DOMAIN + request.rawPath;
     if (!fullUrl.endsWith('/api/users/login'))
         return true;
-    const body = JSON.parse(request.body);
     let ossRes = void 0;
     try {
         ossRes = await client.get('sync.json');
     }
     catch (error) { }
     const syncData = JSON.parse(ossRes?.content || '{}');
-    const loginData = JSON.parse(body || '{}');
+    const loginData = JSON.parse(request.body || '{}');
     const loginResponse = syncData?.loginResponse;
     const accountList = (syncData?.accountList || []);
     const loginRes = await (0, node_fetch_1.default)(fullUrl, {
@@ -40,7 +39,7 @@ const handleLogin = async (request, response) => {
             Referer: 'http://175.27.166.226/',
             'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
-        body: body,
+        body: request.body,
         method: 'POST',
     });
     response.headers['Content-Type'] = 'application/json; charset=utf-8';
