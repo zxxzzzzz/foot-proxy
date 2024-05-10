@@ -2,6 +2,7 @@ import OSS from 'ali-oss';
 import { URL } from 'url';
 import Cookie from 'cookie';
 import { Request, Response } from './type';
+import fetch from 'node-fetch';
 
 const client = new OSS({
   // yourRegion填写Bucket所在地域。以华东1（杭州）为例，Region填写为oss-cn-hangzhou。
@@ -43,10 +44,10 @@ export const handleLogin = async (request: Request, response: Response) => {
   response.headers['Content-Type'] = 'application/json; charset=utf-8';
   if (loginRes.status === 200) {
     const text = await loginRes.text();
-    const cookieToSet = loginRes.headers.getSetCookie();
+    const cookieToSet = loginRes.headers.get('set-cookie');
     response.statusCode = 200;
     response.headers['set-cookie'] = [
-      ...cookieToSet,
+      cookieToSet||'',
       Cookie.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
     ];
     response.body = text;
@@ -169,7 +170,7 @@ export const handleLogout = async (req: Request, response: Response) => {
   const text = await res.text();
   response.statusCode = res.status;
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.getSetCookie();
+  response.headers['set-cookie'] = res.headers.get('set-cookie')||'';
   response.body = text;
   return false;
 };
@@ -190,7 +191,7 @@ export const handleOtherApi = async (req: Request, response: Response) => {
   const method = req.requestContext.http.method.toLowerCase();
   const res = await fetch(fullUrl, {
     method,
-    body: method === 'post' ? req.body : null,
+    body: method === 'post' ? req.body : void 0,
     headers: {
       cookie: req.headers['cookie'],
       accept: 'application/json, text/plain, */*',
@@ -203,7 +204,7 @@ export const handleOtherApi = async (req: Request, response: Response) => {
   const text = await res.text();
   const accountItem = accountList.find((item) => item.account === account);
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.getSetCookie();
+  response.headers['set-cookie'] = res.headers.get('set-cookie')||'';
   if (accountItem && accountItem.token !== token) {
     response.statusCode = 405;
     response.body = '';
