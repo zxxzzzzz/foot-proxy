@@ -14,7 +14,8 @@ const pipe = async (event, context, callback, funcList: ((req: Request, res: Res
   };
   try {
     for (const func of funcList) {
-      await func(request, response);
+      const isContinue = await func(request, response);
+      if (!isContinue) break;
     }
   } catch (error) {
     callback(null, { statusCode: 405, body: error.message });
