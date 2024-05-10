@@ -8,7 +8,7 @@ const pipe = async (event, context, callback, funcList) => {
         request.body = JSON.parse(request.body);
     }
     const response = {
-        statusCode: 405,
+        statusCode: 400,
         headers: {},
         isBase64Encoded: false,
         body: '',
