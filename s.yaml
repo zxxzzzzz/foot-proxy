@@ -10,7 +10,7 @@ resources:
       region: cn-hangzhou # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
       functionName: data
       runtime: nodejs20
-      code: ./code
+      code: ./dist
       cpu: 1
       handler: index.data
       memorySize: 1024
