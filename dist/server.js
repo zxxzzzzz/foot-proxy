@@ -7,6 +7,7 @@ exports.handleStatic = exports.handleOtherApi = exports.handleLogout = exports.h
 const ali_oss_1 = __importDefault(require("ali-oss"));
 const url_1 = require("url");
 const cookie_1 = __importDefault(require("cookie"));
+const node_fetch_1 = __importDefault(require("node-fetch"));
 const client = new ali_oss_1.default({
     region: 'oss-cn-hangzhou',
     accessKeyId: 'LTAI5tNpSy9xc' + 'TEcAK7M7Uxu',
@@ -29,7 +30,7 @@ const handleLogin = async (request, response) => {
     const loginData = JSON.parse(body || '{}');
     const loginResponse = syncData?.loginResponse;
     const accountList = (syncData?.accountList || []);
-    const loginRes = await fetch(fullUrl, {
+    const loginRes = await (0, node_fetch_1.default)(fullUrl, {
         headers: {
             accept: 'application/json, text/plain, */*',
             'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
@@ -45,10 +46,10 @@ const handleLogin = async (request, response) => {
     response.headers['Content-Type'] = 'application/json; charset=utf-8';
     if (loginRes.status === 200) {
         const text = await loginRes.text();
-        const cookieToSet = loginRes.headers.getSetCookie();
+        const cookieToSet = loginRes.headers.get('set-cookie');
         response.statusCode = 200;
         response.headers['set-cookie'] = [
-            ...cookieToSet,
+            cookieToSet || '',
             cookie_1.default.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
         ];
         response.body = text;
@@ -160,7 +161,7 @@ const handleLogout = async (req, response) => {
         return false;
     }
     const method = req.requestContext.http.method.toLowerCase();
-    const res = await fetch(fullUrl, {
+    const res = await (0, node_fetch_1.default)(fullUrl, {
         method,
         body: req.body,
         headers: {
@@ -175,7 +176,7 @@ const handleLogout = async (req, response) => {
     const text = await res.text();
     response.statusCode = res.status;
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response.headers['set-cookie'] = res.headers.getSetCookie();
+    response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
     response.body = text;
     return false;
 };
@@ -193,9 +194,9 @@ const handleOtherApi = async (req, response) => {
     const account = cookie?.account;
     const token = cookie?.token;
     const method = req.requestContext.http.method.toLowerCase();
-    const res = await fetch(fullUrl, {
+    const res = await (0, node_fetch_1.default)(fullUrl, {
         method,
-        body: method === 'post' ? req.body : null,
+        body: method === 'post' ? req.body : void 0,
         headers: {
             cookie: req.headers['cookie'],
             accept: 'application/json, text/plain, */*',
@@ -208,7 +209,7 @@ const handleOtherApi = async (req, response) => {
     const text = await res.text();
     const accountItem = accountList.find((item) => item.account === account);
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response.headers['set-cookie'] = res.headers.getSetCookie();
+    response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
     if (accountItem && accountItem.token !== token) {
         response.statusCode = 405;
         response.body = '';
@@ -226,7 +227,7 @@ const handleStatic = async (req, response) => {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await fetch(fullUrl);
+        const res = await (0, node_fetch_1.default)(fullUrl);
         const data = await res.text();
         response.statusCode = 200;
         response.headers['Content-Type'] = 'text/html;charset=UTF-8';
@@ -244,7 +245,7 @@ const handleStatic = async (req, response) => {
     if (!matchedItem) {
         return true;
     }
-    const res = await fetch(fullUrl);
+    const res = await (0, node_fetch_1.default)(fullUrl);
     response.statusCode = 200;
     response.headers['Content-Type'] = matchedItem[1];
     if (matchedItem[1].startsWith('text')) {
