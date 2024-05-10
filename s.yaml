@@ -18,7 +18,7 @@ resources:
       description: '球类网站缓存数据'
       timeout: 60
       layers:
-        - acs:fc:cn-hangzhou:1048992591952509:layers/ball/versions/2
+        - acs:fc:cn-hangzhou:1048992591952509:layers/foot-proxy/versions/1
       instanceConcurrency: 1
       triggers:
         - triggerName: httpTrigger
