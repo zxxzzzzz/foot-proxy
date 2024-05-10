@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "module": "commonjs",
+    "lib": ["DOM"],
+    "target": "ESNext",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "rootDir": "./src",
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+  },
+  "include": [
+    "src"
+  ]
+}

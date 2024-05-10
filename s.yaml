@@ -1,0 +1,44 @@
+
+edition: 3.0.0
+name: foot-proxy
+access: "default"
+
+resources:
+  data:
+    component: fc3
+    props: # 组件的属性值
+      region: cn-hangzhou # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
+      functionName: data
+      runtime: nodejs20
+      code: ./code
+      cpu: 1
+      handler: index.data
+      memorySize: 1024
+      diskSize: 512
+      description: '球类网站缓存数据'
+      timeout: 60
+      layers:
+        - acs:fc:cn-hangzhou:1048992591952509:layers/ball/versions/2
+      instanceConcurrency: 1
+      triggers:
+        - triggerName: httpTrigger
+          triggerType: http
+          triggerConfig:
+            authType: anonymous
+            methods:
+              - GET
+              - POST
+  fc-domain: #  服务名称
+    component: fc3-domain
+    props: #  组件的属性值
+      region: cn-hangzhou
+      domainName: auto
+      protocol: HTTP # HTTP | HTTPS 
+      routeConfig:
+        routes:
+          - functionName: data
+            methods:
+              - POST
+              - GET
+            path: /*
+            qualifier: LATEST
