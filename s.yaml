@@ -9,7 +9,7 @@ resources:
     props: # 组件的属性值
       region: cn-hangzhou # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
       functionName: proxy
-      runtime: nodejs16
+      runtime: nodejs20
       code: ./dist
       cpu: 1
       handler: index.data
@@ -17,8 +17,6 @@ resources:
       diskSize: 512
       description: 'proxy'
       timeout: 60
-      layers:
-        - acs:fc:cn-hangzhou:1048992591952509:layers/foot-proxy/versions/2
       instanceConcurrency: 1
       triggers:
         - triggerName: httpTrigger

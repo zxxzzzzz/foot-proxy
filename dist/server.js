@@ -6,8 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleStatic = exports.handleOtherApi = exports.handleLogout = exports.handleLogin = void 0;
 const ali_oss_1 = __importDefault(require("ali-oss"));
 const url_1 = require("url");
-const cookie_1 = __importDefault(require("cookie"));
-const node_fetch_1 = __importDefault(require("node-fetch"));
 const client = new ali_oss_1.default({
     region: 'oss-cn-hangzhou',
     accessKeyId: 'LTAI5tNpSy9xc' + 'TEcAK7M7Uxu',
@@ -15,6 +13,22 @@ const client = new ali_oss_1.default({
     bucket: 'footballc',
     internal: true,
 });
+const Cookie = {
+    stringify: (key, value) => {
+        return `${key}=${value};Path=/;httpOnly;Max-Age=86400`;
+    },
+    parse: (str) => {
+        const strList = [].concat(str);
+        return strList.reduce((re, cur) => {
+            const itemStr = cur.split(';')[0];
+            const [k, v] = itemStr.split('=');
+            return {
+                ...re,
+                [k]: v,
+            };
+        }, {});
+    },
+};
 const DOMAIN = 'http://175.27.166.226';
 const handleLogin = async (request, response) => {
     const fullUrl = DOMAIN + request.rawPath;
@@ -29,13 +43,12 @@ const handleLogin = async (request, response) => {
     const loginData = JSON.parse(request.body || '{}');
     const loginResponse = syncData?.loginResponse;
     const accountList = (syncData?.accountList || []);
-    const loginRes = await (0, node_fetch_1.default)(fullUrl, {
+    const loginRes = await fetch(fullUrl, {
         headers: {
             accept: 'application/json, text/plain, */*',
             'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
             'content-type': 'application/json;charset=UTF-8',
             'proxy-connection': 'keep-alive',
-            cookie: request.headers['cookie'],
             Referer: 'http://175.27.166.226/',
             'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
@@ -45,12 +58,12 @@ const handleLogin = async (request, response) => {
     response.headers['Content-Type'] = 'application/json; charset=utf-8';
     if (loginRes.status === 200) {
         const text = await loginRes.text();
-        const cookieToSet = loginRes.headers.get('set-cookie');
+        const cookieToSet = loginRes.headers.getSetCookie();
         response.statusCode = 200;
-        response.headers['set-cookie'] = [
-            cookieToSet || '',
-            cookie_1.default.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-        ].join(',');
+        response.headers['set-cookie'] = Cookie.stringify('data', JSON.stringify({
+            ...Cookie.parse(cookieToSet),
+            account: loginData.account,
+        }));
         response.body = text;
         const date = loginRes.headers.get('Date') || new Date().toUTCString();
         try {
@@ -90,11 +103,7 @@ const handleLogin = async (request, response) => {
     }
     const token = `${new Date().valueOf()}`;
     response.statusCode = 200;
-    response.headers['set-cookie'] = [
-        ...(loginResponse?.headers?.['Set-Cookie'] || []),
-        cookie_1.default.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-        cookie_1.default.serialize('token', token, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-    ].join(',');
+    response.headers['set-cookie'] = Cookie.stringify('data', JSON.stringify({ ...Cookie.parse(loginResponse?.headers?.['Set-Cookie'] || []), account: loginData.account, token }));
     response.headers['Date'] = loginResponse.headers['Date'];
     response.body = loginResponse.body || '';
     try {
@@ -129,15 +138,15 @@ const handleLogout = async (req, response) => {
     catch (error) { }
     const syncData = JSON.parse(ossRes?.content || '{}');
     const accountList = (syncData?.accountList || []);
-    const cookie = cookie_1.default.parse(req.headers['cookie']);
+    const cookie = Cookie.parse(req.headers['cookie']);
     const account = cookie?.account;
     if (accountList.some((item) => item.account === account)) {
         response.statusCode = 200;
         response.headers['content-type'] = 'application/json;charset=UTF-8';
-        response.headers['set-cookie'] = [
-            cookie_1.default.serialize('session_id', '', { path: '/', httpOnly: true }),
-            cookie_1.default.serialize('account', '', { path: '/', httpOnly: true }),
-        ];
+        response.headers['set-cookie'] = Cookie.stringify('data', JSON.stringify({
+            session_id: '',
+            account: '',
+        }));
         response.body = '{"success":true,"error":"登出成功"}';
         try {
             const putData = {
@@ -160,7 +169,7 @@ const handleLogout = async (req, response) => {
         return false;
     }
     const method = req.requestContext.http.method.toLowerCase();
-    const res = await (0, node_fetch_1.default)(fullUrl, {
+    const res = await fetch(fullUrl, {
         method,
         body: req.body,
         headers: {
@@ -189,11 +198,11 @@ const handleOtherApi = async (req, response) => {
     catch (error) { }
     const syncData = JSON.parse(ossRes?.content || '{}');
     const accountList = (syncData?.accountList || []);
-    const cookie = cookie_1.default.parse(req.headers['cookie']);
+    const cookie = Cookie.parse(req.headers['cookie']);
     const account = cookie?.account;
     const token = cookie?.token;
     const method = req.requestContext.http.method.toLowerCase();
-    const res = await (0, node_fetch_1.default)(fullUrl, {
+    const res = await fetch(fullUrl, {
         method,
         body: method === 'post' ? req.body : void 0,
         headers: {
@@ -226,7 +235,7 @@ const handleStatic = async (req, response) => {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await (0, node_fetch_1.default)(fullUrl);
+        const res = await fetch(fullUrl);
         const data = await res.text();
         response.statusCode = 200;
         response.headers['Content-Type'] = 'text/html;charset=UTF-8';

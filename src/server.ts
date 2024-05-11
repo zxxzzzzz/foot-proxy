@@ -1,8 +1,6 @@
 import OSS from 'ali-oss';
 import { URL } from 'url';
-import Cookie from 'cookie';
 import { Request, Response } from './type';
-import fetch from 'node-fetch';
 
 const client = new OSS({
   // yourRegion填写Bucket所在地域。以华东1（杭州）为例，Region填写为oss-cn-hangzhou。
@@ -13,6 +11,23 @@ const client = new OSS({
   bucket: 'footballc',
   internal: true,
 });
+
+const Cookie = {
+  stringify: (key: string, value: string) => {
+    return `${key}=${value};Path=/;httpOnly;Max-Age=86400`;
+  },
+  parse: (str: string | string[]) => {
+    const strList: string[] = ([] as string[]).concat(str);
+    return strList.reduce<{ [k: string]: string }>((re, cur) => {
+      const itemStr = cur.split(';')[0];
+      const [k, v] = itemStr.split('=');
+      return {
+        ...re,
+        [k]: v,
+      };
+    }, {});
+  },
+};
 
 const DOMAIN = 'http://175.27.166.226';
 
@@ -33,7 +48,6 @@ export const handleLogin = async (request: Request, response: Response) => {
       'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
       'content-type': 'application/json;charset=UTF-8',
       'proxy-connection': 'keep-alive',
-      cookie: request.headers['cookie'],
       Referer: 'http://175.27.166.226/',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
     },
@@ -43,12 +57,15 @@ export const handleLogin = async (request: Request, response: Response) => {
   response.headers['Content-Type'] = 'application/json; charset=utf-8';
   if (loginRes.status === 200) {
     const text = await loginRes.text();
-    const cookieToSet = loginRes.headers.get('set-cookie');
+    const cookieToSet = loginRes.headers.getSetCookie();
     response.statusCode = 200;
-    response.headers['set-cookie'] = [
-      cookieToSet||'',
-      Cookie.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-    ].join(',');
+    response.headers['set-cookie'] = Cookie.stringify(
+      'data',
+      JSON.stringify({
+        ...Cookie.parse(cookieToSet),
+        account: loginData.account,
+      })
+    );
     response.body = text;
     const date = loginRes.headers.get('Date') || new Date().toUTCString();
     try {
@@ -87,11 +104,10 @@ export const handleLogin = async (request: Request, response: Response) => {
   }
   const token = `${new Date().valueOf()}`;
   response.statusCode = 200;
-  response.headers['set-cookie'] = [
-    ...(loginResponse?.headers?.['Set-Cookie'] || []),
-    Cookie.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-    Cookie.serialize('token', token, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-  ].join(',');
+  response.headers['set-cookie'] = Cookie.stringify(
+    'data',
+    JSON.stringify({ ...Cookie.parse(loginResponse?.headers?.['Set-Cookie'] || []), account: loginData.account, token })
+  );
   response.headers['Date'] = loginResponse.headers['Date'];
   response.body = loginResponse.body || '';
   try {
@@ -128,10 +144,13 @@ export const handleLogout = async (req: Request, response: Response) => {
   if (accountList.some((item) => item.account === account)) {
     response.statusCode = 200;
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response.headers['set-cookie'] = [
-      Cookie.serialize('session_id', '', { path: '/', httpOnly: true }),
-      Cookie.serialize('account', '', { path: '/', httpOnly: true }),
-    ];
+    response.headers['set-cookie'] = Cookie.stringify(
+      'data',
+      JSON.stringify({
+        session_id: '',
+        account: '',
+      })
+    );
     response.body = '{"success":true,"error":"登出成功"}';
     try {
       const putData = {
@@ -169,7 +188,7 @@ export const handleLogout = async (req: Request, response: Response) => {
   const text = await res.text();
   response.statusCode = res.status;
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.get('set-cookie')||'';
+  response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
   response.body = text;
   return false;
 };
@@ -203,7 +222,7 @@ export const handleOtherApi = async (req: Request, response: Response) => {
   const text = await res.text();
   const accountItem = accountList.find((item) => item.account === account);
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.get('set-cookie')||'';
+  response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
   if (accountItem && accountItem.token !== token) {
     response.statusCode = 405;
     response.body = '';
@@ -242,6 +261,6 @@ export const handleStatic = async (req: Request, response: Response) => {
   }
   response.statusCode = 301;
   response.headers = req.headers;
-  response.headers['Location'] = fullUrl
+  response.headers['Location'] = fullUrl;
   return false;
 };
