@@ -50,7 +50,7 @@ const handleLogin = async (request, response) => {
         response.headers['set-cookie'] = [
             cookieToSet || '',
             cookie_1.default.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-        ];
+        ].join(',');
         response.body = text;
         const date = loginRes.headers.get('Date') || new Date().toUTCString();
         try {
@@ -94,7 +94,7 @@ const handleLogin = async (request, response) => {
         ...(loginResponse?.headers?.['Set-Cookie'] || []),
         cookie_1.default.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
         cookie_1.default.serialize('token', token, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-    ];
+    ].join(',');
     response.headers['Date'] = loginResponse.headers['Date'];
     response.body = loginResponse.body || '';
     try {

@@ -48,7 +48,7 @@ export const handleLogin = async (request: Request, response: Response) => {
     response.headers['set-cookie'] = [
       cookieToSet||'',
       Cookie.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-    ];
+    ].join(',');
     response.body = text;
     const date = loginRes.headers.get('Date') || new Date().toUTCString();
     try {
@@ -91,7 +91,7 @@ export const handleLogin = async (request: Request, response: Response) => {
     ...(loginResponse?.headers?.['Set-Cookie'] || []),
     Cookie.serialize('account', loginData.account, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
     Cookie.serialize('token', token, { path: '/', maxAge: 60 * 60 * 24, httpOnly: true }),
-  ];
+  ].join(',');
   response.headers['Date'] = loginResponse.headers['Date'];
   response.body = loginResponse.body || '';
   try {
