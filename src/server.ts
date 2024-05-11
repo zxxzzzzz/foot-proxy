@@ -240,16 +240,8 @@ export const handleStatic = async (req: Request, response: Response) => {
   if (!matchedItem) {
     return true;
   }
-  const res = await fetch(fullUrl);
-  response.statusCode = res.status;
-  response.headers['Content-Type'] = matchedItem[1];
-  if (matchedItem[1].startsWith('text')) {
-    const body = await res.text();
-    response.body = body;
-    return false
-  }
-  const arrBuf = await res.arrayBuffer();
-  const body = Buffer.from(arrBuf).toString('base64');
-  response.body = body;
+  response.statusCode = 301;
+  response.headers = req.headers;
+  response.headers['Location'] = fullUrl
   return false;
 };
