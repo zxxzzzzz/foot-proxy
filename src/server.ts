@@ -57,7 +57,7 @@ const setOssData = async (data: {
 const toFetch = async (request: ParsedRequest) => {
   const fullUrl = DOMAIN + request.rawPath;
   const ossData = await getOssData();
-  const cookieData = request.cookie;
+  const cookieData = request.Cookie;
   const session_id = cookieData.session_id || '';
   const isLogin = fullUrl.endsWith('/api/users/login');
   let account = '';
@@ -117,7 +117,7 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
     const text = await loginRes.text();
     const cookieToSet = loginRes.headers.getSetCookie();
     response.statusCode = 200;
-    response['set-cookie'] = {
+    response['Set-Cookie'] = {
       ...Cookie.parseSetCookie(cookieToSet),
       account: loginData.account,
     };
@@ -146,7 +146,7 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
   }
   const token = `${new Date().valueOf()}`;
   response.statusCode = 200;
-  response['set-cookie'] = {
+  response['Set-Cookie'] = {
     ...Cookie.parseSetCookie(loginResponse?.headers?.['Set-Cookie']),
     account: loginData.account,
     token,
@@ -176,12 +176,12 @@ export const handleLogout = async (req: ParsedRequest, response: ParsedResponse)
   if (!fullUrl.endsWith('/api/users/logout')) return true;
   const syncData = await getOssData();
   const accountList = syncData?.accountList || [];
-  const cookieData = req.cookie;
+  const cookieData = req.Cookie;
   const account = cookieData?.account;
   if (accountList.some((item) => item.account === account)) {
     response.statusCode = 200;
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response['set-cookie'] = {
+    response['Set-Cookie'] = {
       session_id: '',
       account: '',
       token: '',
@@ -205,8 +205,8 @@ export const handleLogout = async (req: ParsedRequest, response: ParsedResponse)
   const text = await res.text();
   response.statusCode = res.status;
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response['set-cookie'] = {
-    account: req.cookie.account || '',
+  response['Set-Cookie'] = {
+    account: req.Cookie.account || '',
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),
   };
   response.body = text;
@@ -221,7 +221,7 @@ export const handleOtherApi = async (req: ParsedRequest, response: ParsedRespons
   } catch (error) {}
   const syncData = await getOssData();
   const ossAccountList = syncData?.accountList || [];
-  const cookieData = req.cookie;
+  const cookieData = req.Cookie;
   const cookieAccount = cookieData?.account;
   const cookieToken = cookieData?.token;
 
@@ -230,10 +230,10 @@ export const handleOtherApi = async (req: ParsedRequest, response: ParsedRespons
   const accountItem = ossAccountList.find((item) => item.account === cookieAccount);
 
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response['set-cookie'] = {
+  response['Set-Cookie'] = {
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),
-    account: req.cookie.account || '',
-    token: req.cookie.token || '',
+    account: req.Cookie.account || '',
+    token: req.Cookie.token || '',
   };
   if (accountItem && accountItem.token !== cookieToken && accountItem.token) {
     response.statusCode = 400;
@@ -242,7 +242,7 @@ export const handleOtherApi = async (req: ParsedRequest, response: ParsedRespons
   }
   response.statusCode = res.status === 405 ? 400 : res.status;
   if (response.statusCode !== 200) {
-    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.cookie, header:req.headers });
+    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.Cookie, header:req.headers });
     return false;
   }
   response.body = text;

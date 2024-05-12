@@ -7,7 +7,7 @@ const pipe = async (event, context, callback, funcList) => {
     const request = JSON.parse(event.toString());
     const parsedResponse = {
         statusCode: 400,
-        'set-cookie': {},
+        'Set-Cookie': {},
         headers: {},
         isBase64Encoded: false,
         body: '',
@@ -22,7 +22,7 @@ const pipe = async (event, context, callback, funcList) => {
         method: request.requestContext.http.method.toLowerCase(),
         isBase64Encoded: request.isBase64Encoded,
         body: request.body,
-        cookie,
+        Cookie: cookie,
         headers: request.headers,
     };
     try {
@@ -35,7 +35,7 @@ const pipe = async (event, context, callback, funcList) => {
     catch (error) {
         callback(null, { statusCode: 400, body: error.stack || '', isBase64Encoded: false, headers: {} });
     }
-    if (!parsedResponse['set-cookie'] || !Object.keys(parsedResponse['set-cookie']).length) {
+    if (!parsedResponse['Set-Cookie'] || !Object.keys(parsedResponse['Set-Cookie']).length) {
         callback(null, {
             statusCode: parsedResponse.statusCode,
             headers: { ...parsedResponse.headers },
@@ -44,7 +44,7 @@ const pipe = async (event, context, callback, funcList) => {
         });
         return;
     }
-    const setCookieStr = cookie_1.Cookie.stringifyToSetCookie('data', JSON.stringify(parsedResponse['set-cookie']));
+    const setCookieStr = cookie_1.Cookie.stringifyToSetCookie('data', JSON.stringify(parsedResponse['Set-Cookie']));
     callback(null, {
         statusCode: parsedResponse.statusCode,
         headers: { ...parsedResponse.headers, 'set-cookie': setCookieStr },
