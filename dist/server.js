@@ -265,18 +265,18 @@ const handleStatic = async (req, response) => {
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
-        const res = await toFetch(req);
-        response.statusCode = res.status;
-        response.headers = {
-            'content-type': matchedItem.type,
-        };
-        response.isBase64Encoded = matchedItem.isBase64Encoded;
-        if (matchedItem.isBase64Encoded) {
-            const b = await res.arrayBuffer();
-            response.body = Buffer.from(b).toString('base64');
+        if (matchedItem.ext === '.js') {
+            const res = await toFetch(req);
+            response.statusCode = res.status;
+            response.headers = {
+                'content-type': matchedItem.type,
+            };
+            response.isBase64Encoded = matchedItem.isBase64Encoded;
+            response.body = await res.text();
             return false;
         }
-        response.body = await res.text();
+        response.statusCode = 301;
+        response.headers['Location'] = fullUrl;
         return false;
     }
     return true;
