@@ -231,6 +231,10 @@ const handleOtherApi = async (req, response) => {
         return false;
     }
     response.statusCode = res.status === 405 ? 400 : res.status;
+    if (response.statusCode !== 200) {
+        response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.cookie });
+        return false;
+    }
     response.body = text;
     return false;
 };
