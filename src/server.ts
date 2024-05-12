@@ -1,6 +1,7 @@
 import OSS from 'ali-oss';
 import { URL } from 'url';
-import { Request, Response } from './type';
+import { ParsedRequest, ParsedResponse, Request, Response } from './type';
+import { Cookie } from './cookie';
 
 const client = new OSS({
   // yourRegion填写Bucket所在地域。以华东1（杭州）为例，Region填写为oss-cn-hangzhou。
@@ -12,69 +13,115 @@ const client = new OSS({
   internal: true,
 });
 
-const Cookie = {
-  stringify: (key: string, value: string) => {
-    return `${key}=${value};Path=/;httpOnly;Max-Age=86400`;
-  },
-  parse: (str: string | string[]) => {
-    const strList: string[] = ([] as string[]).concat(str);
-    return strList.reduce<{ [k: string]: string }>((re, cur) => {
-      const itemStr = cur.split(';')[0];
-      const [k, v] = itemStr.split('=');
-      return {
-        ...re,
-        [k]: v,
-      };
-    }, {});
-  },
+const getOssData = async () => {
+  let ossRes: any = void 0;
+  try {
+    ossRes = await client.get(OSS_FILE_NAME);
+  } catch (error) {
+    return {
+      accountList: [],
+      loginResponse: {
+        headers: { 'Set-Cookie': [], Date: '' },
+        body: '',
+      },
+    };
+  }
+  const syncData = JSON.parse(ossRes?.content || '{}');
+  return syncData as {
+    accountList: { account: string; password: string; token: string }[];
+    loginResponse: {
+      headers: { 'Set-Cookie': string[]; Date: string };
+      body: string;
+    };
+  };
+};
+const setOssData = async (data: {
+  accountList?: { account: string; password: string; token: string }[];
+  loginResponse?: {
+    headers?: { 'Set-Cookie': string[]; Date: string };
+    body?: string;
+  };
+}) => {
+  const ossData = await getOssData();
+  const accountList = data.accountList || ossData.accountList;
+  const headers = data.loginResponse?.headers || ossData.loginResponse.headers;
+  const body = data.loginResponse?.body || ossData.loginResponse.body;
+  try {
+    const putData = { accountList, loginResponse: { headers, body } };
+    await client.put(OSS_FILE_NAME, Buffer.from(JSON.stringify(putData)));
+  } catch (error) {
+    console.log('put error', error);
+  }
+};
+
+const toFetch = async (request: ParsedRequest) => {
+  const fullUrl = DOMAIN + request.rawPath;
+  const ossData = await getOssData();
+  const cookieData = request.cookie;
+  const session_id = cookieData.session_id || '';
+  const isLogin = fullUrl.endsWith('/api/users/login');
+  let account = '';
+  if (cookieData.account) {
+    account = cookieData.account;
+  }
+  if (isLogin) {
+    const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
+    account = loginData.account;
+  }
+  const res = await fetch(fullUrl, {
+    headers: {
+      ...request.headers,
+      cookie: `session_id=${session_id}`,
+    },
+    body: request.body,
+    method: request.method,
+  });
+  const isPublicAccount = !ossData.accountList.some((ac) => ac.account === account) && account;
+  if (!isPublicAccount) return res;
+  const cookieToSet = res.headers.getSetCookie();
+  if (!cookieToSet?.length) return res;
+  if (isLogin) {
+    const body = await res.text();
+    await setOssData({
+      loginResponse: {
+        headers: { 'Set-Cookie': cookieToSet, Date: res.headers.get('Date') || '' },
+        body,
+      },
+    });
+    res.text = () => {
+      return Promise.resolve(body);
+    };
+    return res;
+  }
+  await setOssData({
+    loginResponse: {
+      headers: { 'Set-Cookie': cookieToSet, Date: res.headers.get('Date') || '' },
+    },
+  });
+  return res;
 };
 
 const DOMAIN = 'http://175.27.166.226';
+const OSS_FILE_NAME = 'sync.json';
 
-export const handleLogin = async (request: Request, response: Response) => {
+export const handleLogin = async (request: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + request.rawPath;
   if (!fullUrl.endsWith('/api/users/login')) return true;
-  let ossRes: any = void 0;
-  try {
-    ossRes = await client.get('sync.json');
-  } catch (error) {}
-  const syncData = JSON.parse(ossRes?.content || '{}');
+  const syncData = await getOssData();
   const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
-  const loginResponse = syncData?.loginResponse as { headers: { 'Set-Cookie': string[]; Date: string }; body: string };
-  const accountList = (syncData?.accountList || []) as { account: string; password: string; timestamp: number }[];
-  const loginRes = await fetch(fullUrl, {
-    headers: {
-      accept: 'application/json, text/plain, */*',
-      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
-      'content-type': 'application/json;charset=UTF-8',
-      'proxy-connection': 'keep-alive',
-      Referer: 'http://175.27.166.226/',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-    },
-    body: request.body,
-    method: 'POST',
-  });
+  const loginResponse = syncData?.loginResponse;
+  const accountList = syncData?.accountList || [];
+  const loginRes = await toFetch(request);
   response.headers['Content-Type'] = 'application/json; charset=utf-8';
   if (loginRes.status === 200) {
     const text = await loginRes.text();
     const cookieToSet = loginRes.headers.getSetCookie();
     response.statusCode = 200;
-    response.headers['set-cookie'] = Cookie.stringify(
-      'data',
-      JSON.stringify({
-        ...Cookie.parse(cookieToSet),
-        account: loginData.account,
-      })
-    );
+    response['set-cookie'] = {
+      ...Cookie.parseSetCookie(cookieToSet),
+      account: loginData.account,
+    };
     response.body = text;
-    const date = loginRes.headers.get('Date') || new Date().toUTCString();
-    try {
-      const putData = { ...syncData, loginResponse: { headers: { 'Set-Cookie': cookieToSet, Date: date }, body: text } };
-      await client.put('sync.json', Buffer.from(JSON.stringify(putData)));
-    } catch (error) {
-      console.log('put error', error);
-    }
-    return false;
   }
   if (!accountList?.length) {
     response.statusCode = 400;
@@ -92,11 +139,6 @@ export const handleLogin = async (request: Request, response: Response) => {
     response.body = '{"success":false,"error":"该内部账号密码不正确"}';
     return false;
   }
-  if (new Date().valueOf() - (accountItem?.timestamp || 0) <= 1000 * 60 * 5) {
-    response.statusCode = 400;
-    response.body = '{"success":false,"error":"该内部账号正在被使用"}';
-    return false;
-  }
   if (!loginResponse) {
     response.statusCode = 400;
     response.body = '{"success":false,"error":"外部账号未登录,所以内部账号无法使用"}';
@@ -104,15 +146,15 @@ export const handleLogin = async (request: Request, response: Response) => {
   }
   const token = `${new Date().valueOf()}`;
   response.statusCode = 200;
-  response.headers['set-cookie'] = Cookie.stringify(
-    'data',
-    JSON.stringify({ ...Cookie.parse(loginResponse?.headers?.['Set-Cookie'] || []), account: loginData.account, token })
-  );
+  response['set-cookie'] = {
+    ...Cookie.parseSetCookie(loginResponse?.headers?.['Set-Cookie']),
+    account: loginData.account,
+    token,
+  };
   response.headers['Date'] = loginResponse.headers['Date'];
   response.body = loginResponse.body || '';
   try {
-    const putData = {
-      ...syncData,
+    setOssData({
       accountList: accountList.map((item) => {
         if (item.account === loginData.account) {
           return {
@@ -122,108 +164,78 @@ export const handleLogin = async (request: Request, response: Response) => {
         }
         return item;
       }),
-    };
-    await client.put('sync.json', Buffer.from(JSON.stringify(putData)));
+    });
   } catch (error) {
     console.log('put error', error);
   }
   return false;
 };
 // http://175.27.166.226/api/users/logout
-export const handleLogout = async (req: Request, response: Response) => {
+export const handleLogout = async (req: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + req.rawPath;
   if (!fullUrl.endsWith('/api/users/logout')) return true;
-  let ossRes: any = void 0;
-  try {
-    ossRes = await client.get('sync.json');
-  } catch (error) {}
-  const syncData = JSON.parse(ossRes?.content || '{}');
-  const accountList = (syncData?.accountList || []) as { account: string; password: string }[];
-  const cookie = Cookie.parse(req.headers['cookie']);
-  const account = cookie?.account;
+  const syncData = await getOssData();
+  const accountList = syncData?.accountList || [];
+  const cookieData = req.cookie;
+  const account = cookieData?.account;
   if (accountList.some((item) => item.account === account)) {
     response.statusCode = 200;
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response.headers['set-cookie'] = Cookie.stringify(
-      'data',
-      JSON.stringify({
-        session_id: '',
-        account: '',
-      })
-    );
+    response['set-cookie'] = {
+      session_id: '',
+      account: '',
+      token: '',
+    };
     response.body = '{"success":true,"error":"登出成功"}';
-    try {
-      const putData = {
-        ...syncData,
-        accountList: accountList.map((item) => {
-          if (item.account === account) {
-            return {
-              ...item,
-              token: '',
-            };
-          }
-          return item;
-        }),
-      };
-      await client.put('sync.json', Buffer.from(JSON.stringify(putData)));
-    } catch (error) {
-      console.log('put error', error);
-    }
+    await setOssData({
+      accountList: accountList.map((item) => {
+        if (item.account === account) {
+          return {
+            ...item,
+            token: '',
+          };
+        }
+        return item;
+      }),
+    });
     return false;
   }
   // 外部账号登出
-  const method = req.requestContext.http.method.toLowerCase();
-  const res = await fetch(fullUrl, {
-    method,
-    body: req.body,
-    headers: {
-      cookie: req.headers['cookie'],
-      accept: 'application/json, text/plain, */*',
-      'accept-language': 'zh-CN,zh;q=0.9',
-      'content-type': 'application/json;charset=UTF-8',
-      Referer: 'http://175.27.166.226/',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-    },
-  });
+  const res = await toFetch(req);
   const text = await res.text();
   response.statusCode = res.status;
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
+  response['set-cookie'] = {
+    account: req.cookie.account || '',
+    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
+  };
   response.body = text;
   return false;
 };
 
 // 其他请求全部透传
-export const handleOtherApi = async (req: Request, response: Response) => {
-  const fullUrl = DOMAIN + req.rawPath;
+export const handleOtherApi = async (req: ParsedRequest, response: ParsedResponse) => {
   let ossRes: any = void 0;
   try {
-    ossRes = await client.get('sync.json');
+    ossRes = await client.get(OSS_FILE_NAME);
   } catch (error) {}
-  const syncData = JSON.parse(ossRes?.content || '{}');
-  const accountList = (syncData?.accountList || []) as { account: string; password: string; token: string }[];
-  const cookie = Cookie.parse(req.headers['cookie']);
-  const account = cookie?.account;
-  const token = cookie?.token;
+  const syncData = await getOssData();
+  const ossAccountList = syncData?.accountList || [];
+  const cookieData = req.cookie;
+  const cookieAccount = cookieData?.account;
+  const cookieToken = cookieData?.token;
 
-  const method = req.requestContext.http.method.toLowerCase();
-  const res = await fetch(fullUrl, {
-    method,
-    body: method === 'post' ? req.body : void 0,
-    headers: {
-      cookie: req.headers['cookie'],
-      accept: 'application/json, text/plain, */*',
-      'accept-language': 'zh-CN,zh;q=0.9',
-      'content-type': 'application/json;charset=UTF-8',
-      Referer: 'http://175.27.166.226/',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-    },
-  });
+  const res = await toFetch(req);
   const text = await res.text();
-  const accountItem = accountList.find((item) => item.account === account);
+  const accountItem = ossAccountList.find((item) => item.account === cookieAccount);
+
   response.headers['content-type'] = 'application/json;charset=UTF-8';
-  response.headers['set-cookie'] = res.headers.get('set-cookie') || '';
-  if (accountItem && accountItem.token !== token) {
+  response['set-cookie'] = {
+    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
+    account: req.cookie.account || '',
+    token: req.cookie.token || '',
+  };
+  if (accountItem && accountItem.token !== cookieToken && accountItem.token) {
     response.statusCode = 405;
     response.body = '';
     return false;
@@ -233,14 +245,14 @@ export const handleOtherApi = async (req: Request, response: Response) => {
   return false;
 };
 
-export const handleStatic = async (req: Request, response: Response) => {
+export const handleStatic = async (req: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + req.rawPath;
   const parsedUrl = new URL('', fullUrl);
-  if (req.requestContext.http.method.toLowerCase() !== 'get') {
+  if (req.method !== 'get') {
     return true;
   }
   if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-    const res = await fetch(fullUrl);
+    const res = await toFetch(req);
     const data = await res.text();
     response.statusCode = 200;
     response.headers['Content-Type'] = 'text/html;charset=UTF-8';

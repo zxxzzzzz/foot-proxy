@@ -1,4 +1,3 @@
-
 export type Request = {
   version: string;
   rawPath: string;
@@ -26,12 +25,31 @@ export type Request = {
     timeEpoch: '1693896071895';
   };
 };
+export type ParsedRequest = {
+  rawPath: string;
+  body: string;
+  isBase64Encoded: boolean;
+  cookie: { [k: string]: string };
+  headers: {
+    [key: string]: string;
+  };
+  method: string;
+};
 
 export type Response = {
-  "statusCode": number,
-  "headers": {
-    [key: string]: string | string[];
-  },
-  "isBase64Encoded": boolean,
-  "body": string
-}
+  statusCode: number;
+  headers: {
+    [key: string]: string;
+  };
+  isBase64Encoded?: boolean;
+  body: string;
+};
+export type ParsedResponse = {
+  statusCode: number;
+  'set-cookie': { [key: string]: string };
+  headers: {
+    [key: string]: string;
+  };
+  isBase64Encoded?: boolean;
+  body: string;
+};
