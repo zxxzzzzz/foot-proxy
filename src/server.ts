@@ -241,8 +241,8 @@ export const handleOtherApi = async (req: ParsedRequest, response: ParsedRespons
     return false;
   }
   response.statusCode = res.status === 405 ? 400 : res.status;
-  if(response.statusCode !== 200){
-    response.body = JSON.stringify({...JSON.parse(text), cookie:req.cookie});
+  if (response.statusCode !== 200) {
+    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.cookie, header:req.headers });
     return false;
   }
   response.body = text;
@@ -286,7 +286,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
       response.body = Buffer.from(b).toString('base64');
       return false;
     }
-    response.body = await res.text()
+    response.body = await res.text();
     return false;
   }
   return true;

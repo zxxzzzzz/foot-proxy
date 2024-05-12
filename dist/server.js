@@ -232,7 +232,7 @@ const handleOtherApi = async (req, response) => {
     }
     response.statusCode = res.status === 405 ? 400 : res.status;
     if (response.statusCode !== 200) {
-        response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.cookie });
+        response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.cookie, header: req.headers });
         return false;
     }
     response.body = text;
