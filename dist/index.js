@@ -12,7 +12,7 @@ const pipe = async (event, context, callback, funcList) => {
         isBase64Encoded: false,
         body: '',
     };
-    let cookie = cookie_1.Cookie.parseCookie(request.headers['cookie']);
+    let cookie = cookie_1.Cookie.parseCookie(request.headers['Cookie']);
     if (cookie.__data) {
         Object.assign(cookie, JSON.parse(cookie.__data || '{}'));
         delete cookie.__data;

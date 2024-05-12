@@ -17,7 +17,7 @@ const pipe = async (
     body: '',
   };
 
-  let cookie = Cookie.parseCookie(request.headers['cookie']);
+  let cookie = Cookie.parseCookie(request.headers['Cookie']);
   if (cookie.__data) {
     Object.assign(cookie, JSON.parse(cookie.__data||'{}'));
     delete cookie.__data;
