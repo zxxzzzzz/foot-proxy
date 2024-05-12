@@ -20,7 +20,7 @@ export const Cookie = {
     if (!str) return {};
     return str.split(';').reduce((re, cur) => {
       const [k, v] = cur.split('=');
-      return { ...re, [k]: v };
+      return { ...re, [k.trim()]: v };
     }, {} as { [k: string]: string });
   },
 };
