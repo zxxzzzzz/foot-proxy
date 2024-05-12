@@ -25,7 +25,7 @@ const pipe = async (
 
   const parsedRequest: ParsedRequest = {
     rawPath: request.rawPath,
-    method: request.requestContext.http.method,
+    method: request.requestContext.http.method.toLowerCase(),
     isBase64Encoded: request.isBase64Encoded,
     body: request.body,
     cookie,

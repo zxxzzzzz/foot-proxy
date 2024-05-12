@@ -63,7 +63,7 @@ const toFetch = async (request) => {
             ...request.headers,
             cookie: `session_id=${session_id}`,
         },
-        body: request.body,
+        body: ['get', 'head'].includes(request.method) ? null : request.body,
         method: request.method,
     });
     const isPublicAccount = !ossData.accountList.some((ac) => ac.account === account) && account;
