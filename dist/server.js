@@ -265,7 +265,7 @@ const handleStatic = async (req, response) => {
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
-        if (['.js', '.woff', 'ttf'].includes(matchedItem.ext)) {
+        if (['.js', '.woff', '.ttf', '.css'].includes(matchedItem.ext)) {
             const res = await toFetch(req);
             response.statusCode = res.status;
             response.headers = {
