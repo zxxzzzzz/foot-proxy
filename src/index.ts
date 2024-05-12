@@ -49,7 +49,7 @@ const pipe = async (
     });
     return;
   }
-  const setCookieStr = Cookie.stringifyToSetCookie('data', JSON.stringify(parsedResponse['Set-Cookie']));
+  const setCookieStr = Cookie.stringifyToSetCookie('__data', JSON.stringify(parsedResponse['Set-Cookie']));
   callback(null, {
     statusCode: parsedResponse.statusCode,
     headers: { ...parsedResponse.headers, 'set-cookie': setCookieStr },

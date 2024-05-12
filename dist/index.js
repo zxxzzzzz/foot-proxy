@@ -44,7 +44,7 @@ const pipe = async (event, context, callback, funcList) => {
         });
         return;
     }
-    const setCookieStr = cookie_1.Cookie.stringifyToSetCookie('data', JSON.stringify(parsedResponse['Set-Cookie']));
+    const setCookieStr = cookie_1.Cookie.stringifyToSetCookie('__data', JSON.stringify(parsedResponse['Set-Cookie']));
     callback(null, {
         statusCode: parsedResponse.statusCode,
         headers: { ...parsedResponse.headers, 'set-cookie': setCookieStr },
