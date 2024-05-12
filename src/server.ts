@@ -260,34 +260,29 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     return false;
   }
   const extList = [
-    ['.js', 'text/javascript;charset=UTF-8'],
-    ['.css', 'text/css;charset=UTF-8'],
-    ['.mp3', 'audio/mpeg;'],
-    ['.jpg', 'image/jpeg;'],
-    ['.png', 'image/png;'],
-    ['.ico', 'image/x-icon'],
+    { ext: '.js', type: 'text/javascript;charset=UTF-8', isBase64Encoded: false },
+    { ext: '.css', type: 'text/css;charset=UTF-8', isBase64Encoded: false },
+    { ext: '.mp3', type: 'audio/mpeg', isBase64Encoded: true },
+    { ext: '.jpg', type: 'image/jpeg', isBase64Encoded: true },
+    { ext: '.png', type: 'image/png', isBase64Encoded: true },
+    { ext: '.ico', type: 'image/x-icon', isBase64Encoded: true },
+    { ext: '.woff', type: 'application/font-woff', isBase64Encoded: true },
+    { ext: '.ttf', type: 'font/ttf', isBase64Encoded: true },
   ];
-  const matchedItem = extList.find((item) => fullUrl.endsWith(item[0]));
+  const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
-    response.statusCode = 301;
-    response.headers = req.headers;
-    response.headers['Location'] = fullUrl;
-    return false;
-  }
-  const extList2 = [
-    ['.woff', 'application/font-woff'],
-    ['.ttf', 'font/ttf'],
-  ];
-  const matchedItem2 = extList2.find((item) => fullUrl.endsWith(item[0]));
-  if (matchedItem2) {
     const res = await toFetch(req);
     response.statusCode = res.status;
     response.headers = {
-      'content-type':matchedItem2[1]
+      'content-type': matchedItem.type,
     };
-    response.isBase64Encoded = true;
-    const b = await res.arrayBuffer()
-    response.body = Buffer.from(b).toString('base64')
+    response.isBase64Encoded = matchedItem.isBase64Encoded;
+    if (matchedItem.isBase64Encoded) {
+      const b = await res.arrayBuffer();
+      response.body = Buffer.from(b).toString('base64');
+      return false;
+    }
+    response.body = await res.text()
     return false;
   }
   return true;
