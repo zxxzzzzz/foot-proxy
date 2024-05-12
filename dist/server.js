@@ -226,11 +226,11 @@ const handleOtherApi = async (req, response) => {
         token: req.cookie.token || '',
     };
     if (accountItem && accountItem.token !== cookieToken && accountItem.token) {
-        response.statusCode = 405;
+        response.statusCode = 400;
         response.body = '';
         return false;
     }
-    response.statusCode = res.status;
+    response.statusCode = res.status === 405 ? 400 : res.status;
     response.body = text;
     return false;
 };
