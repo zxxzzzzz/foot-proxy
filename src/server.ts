@@ -268,11 +268,27 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     ['.ico', 'image/x-icon'],
   ];
   const matchedItem = extList.find((item) => fullUrl.endsWith(item[0]));
-  if (!matchedItem) {
-    return true;
+  if (matchedItem) {
+    response.statusCode = 301;
+    response.headers = req.headers;
+    response.headers['Location'] = fullUrl;
+    return false;
   }
-  response.statusCode = 301;
-  response.headers = req.headers;
-  response.headers['Location'] = fullUrl;
-  return false;
+  const extList2 = [
+    ['.woff', 'application/font-woff'],
+    ['.ttf', 'font/ttf'],
+  ];
+  const matchedItem2 = extList2.find((item) => fullUrl.endsWith(item[0]));
+  if (matchedItem2) {
+    const res = await toFetch(req);
+    response.statusCode = res.status;
+    response.headers = {
+      'content-type':matchedItem2[1]
+    };
+    response.isBase64Encoded = true;
+    const b = await res.arrayBuffer()
+    response.body = Buffer.from(b).toString('base64')
+    return false;
+  }
+  return true;
 };
