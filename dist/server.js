@@ -265,13 +265,18 @@ const handleStatic = async (req, response) => {
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
-        if (matchedItem.ext === '.js') {
+        if (['.js', '.woff', 'ttf'].includes(matchedItem.ext)) {
             const res = await toFetch(req);
             response.statusCode = res.status;
             response.headers = {
                 'content-type': matchedItem.type,
             };
             response.isBase64Encoded = matchedItem.isBase64Encoded;
+            if (matchedItem.isBase64Encoded) {
+                const b = await res.arrayBuffer();
+                response.body = Buffer.from(b).toString('base64');
+                return false;
+            }
             response.body = await res.text();
             return false;
         }

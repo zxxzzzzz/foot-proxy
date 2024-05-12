@@ -242,7 +242,7 @@ export const handleOtherApi = async (req: ParsedRequest, response: ParsedRespons
   }
   response.statusCode = res.status === 405 ? 400 : res.status;
   if (response.statusCode !== 200) {
-    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.Cookie, header:req.headers });
+    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.Cookie, header: req.headers });
     return false;
   }
   response.body = text;
@@ -275,18 +275,23 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
   ];
   const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
-    if(matchedItem.ext === '.js') {
+    if (['.js', '.woff', 'ttf'].includes(matchedItem.ext)) {
       const res = await toFetch(req);
       response.statusCode = res.status;
       response.headers = {
         'content-type': matchedItem.type,
       };
       response.isBase64Encoded = matchedItem.isBase64Encoded;
+      if (matchedItem.isBase64Encoded) {
+        const b = await res.arrayBuffer();
+        response.body = Buffer.from(b).toString('base64');
+        return false;
+      }
       response.body = await res.text();
-      return false
+      return false;
     }
     response.statusCode = 301;
-    response.headers['Location'] = fullUrl
+    response.headers['Location'] = fullUrl;
     return false;
   }
   return true;
