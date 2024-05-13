@@ -113,6 +113,7 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
   const accountList = syncData?.accountList || [];
   const loginRes = await toFetch(request);
   response.headers['Content-Type'] = 'application/json; charset=utf-8';
+  // 主号登录
   if (loginRes.status === 200) {
     const text = await loginRes.text();
     const cookieToSet = loginRes.headers.getSetCookie();
@@ -122,7 +123,9 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
       account: loginData.account,
     };
     response.body = text;
+    return false
   }
+  // 副号登录
   if (!accountList?.length) {
     response.statusCode = 400;
     response.body = '{"success":false,"error":"未配置内部账号"}';

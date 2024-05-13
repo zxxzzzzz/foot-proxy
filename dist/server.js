@@ -113,6 +113,7 @@ const handleLogin = async (request, response) => {
             account: loginData.account,
         };
         response.body = text;
+        return false;
     }
     if (!accountList?.length) {
         response.statusCode = 400;
