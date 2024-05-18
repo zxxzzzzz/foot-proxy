@@ -40,9 +40,10 @@ const pipe = async (
   } catch (error) {
     callback(null, { statusCode: 400, body: (error as Error).stack || '', isBase64Encoded: false, headers: {} });
   }
+  const statusCode = parsedResponse.statusCode === 405 ? 400 : parsedResponse.statusCode
   if (!parsedResponse.setCookie || !Object.keys(parsedResponse.setCookie).length) {
     callback(null, {
-      statusCode: parsedResponse.statusCode,
+      statusCode,
       headers: { ...parsedResponse.headers },
       body: parsedResponse.body,
       isBase64Encoded: parsedResponse.isBase64Encoded,
@@ -51,7 +52,7 @@ const pipe = async (
   }
   const setCookieStr = Cookie.stringifyToSetCookie('__data', JSON.stringify(parsedResponse.setCookie));
   callback(null, {
-    statusCode: parsedResponse.statusCode,
+    statusCode,
     headers: { ...parsedResponse.headers, 'set-cookie': setCookieStr },
     body: parsedResponse.body,
     isBase64Encoded: parsedResponse.isBase64Encoded,
