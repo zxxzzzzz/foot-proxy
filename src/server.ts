@@ -129,6 +129,7 @@ const updateOssAccount = async (account: string, token: string) => {
 const toRecord = (headers: Headers) => {
   const _headers: { [k: string]: string } = {};
   headers.forEach((v, k) => {
+    if (k.toLowerCase() === 'content-length') return;
     _headers[k] = v;
   });
   return _headers;
@@ -190,15 +191,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
   const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
   const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10;
   const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
-  if (!isValidAccount && withCertification) {
-    return new Response('{"success":false,"error":"该内部账号不存在"}', {
-      status: 400,
-      headers: {
-        'content-type': 'application/json',
-      },
-    });
-  }
-  if (isResponseExpired || isForce) {
+  if (isResponseExpired || isForce || !isValidAccount) {
     const res = await fetch(fullUrl, {
       headers: {
         ...request.headers,
