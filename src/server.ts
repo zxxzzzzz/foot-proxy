@@ -13,6 +13,7 @@ type OSSData = {
     url: string;
     headers: { [k: string]: string };
     timestamp: number;
+    maxAge: number;
     account: string;
   }[];
 };
@@ -77,7 +78,7 @@ const updateOssData = async (data: Partial<OSSData>) => {
     console.log('put error', error);
   }
 };
-const updateOssResponseList = async (res: Response, account: string) => {
+const updateOssResponseList = async (res: Response, account: string, maxAge: number) => {
   if (res.status !== 200) return;
   const ossData = await getOssData();
   const headers: { [k: string]: string } = {};
@@ -92,6 +93,7 @@ const updateOssResponseList = async (res: Response, account: string) => {
     url: res.url,
     account,
     timestamp: new Date().valueOf(),
+    maxAge,
   };
   const responseList = uniqBy([...ossData.responseList, response].reverse(), (item) => item.account + ' ' + item.url);
   return updateOssData({
@@ -142,8 +144,13 @@ const toRecord = (headers: Headers) => {
 };
 
 // mock正常返回数据
-const toFetch = async (request: ParsedRequest, account: string, op?: { isForce?: boolean; withCertification?: boolean }) => {
+const toFetch = async (
+  request: ParsedRequest,
+  account: string,
+  op?: { isForce?: boolean; withCertification?: boolean; maxAge?: number }
+) => {
   const isForce = op?.isForce ?? false;
+  const maxAge = op?.maxAge ?? 10 * 1000;
   const withCertification = op?.withCertification ?? true;
   const fullUrl = DOMAIN + request.rawPath;
   const ossData = await getOssData();
@@ -164,7 +171,7 @@ const toFetch = async (request: ParsedRequest, account: string, op?: { isForce?:
       res.text = () => {
         return Promise.resolve(body);
       };
-      await updateOssResponseList(res, '*');
+      await updateOssResponseList(res, '*', maxAge);
       await updateOssGlobalCookie(res);
       return res;
     }
@@ -204,7 +211,7 @@ const toFetch = async (request: ParsedRequest, account: string, op?: { isForce?:
   }
   // 其他请求处理
   const matchedCacheResponse = await getOssResponse(request, account);
-  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10 * 1000;
+  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
   const isValidAccount = ossData.accountList.some((ac) => ac.account === account);
   // 不用认证的请求，直接透传
   if (!withCertification) {
@@ -228,7 +235,7 @@ const toFetch = async (request: ParsedRequest, account: string, op?: { isForce?:
     });
     const body = await res.text();
     res.text = () => Promise.resolve(body);
-    await updateOssResponseList(res, account || '*');
+    await updateOssResponseList(res, account || '*', maxAge);
     return new Response(body, {
       headers: {
         ...toRecord(res.headers),
@@ -314,11 +321,11 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
     const res2 = new Response(body, {
       headers: matchedCacheResponse.headers,
     });
-    await updateOssResponseList(res2, request.cookie.account);
+    await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
     return false;
   }
   // 获取配置
-  const res = await toFetch(request, request.cookie.account ?? '*');
+  const res = await toFetch(request, request.cookie.account ?? '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
   response.headers = toRecord(res.headers);
   response.setCookie = {
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),

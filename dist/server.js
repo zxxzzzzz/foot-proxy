@@ -63,7 +63,7 @@ const updateOssData = async (data) => {
         console.log('put error', error);
     }
 };
-const updateOssResponseList = async (res, account) => {
+const updateOssResponseList = async (res, account, maxAge) => {
     if (res.status !== 200)
         return;
     const ossData = await getOssData();
@@ -79,6 +79,7 @@ const updateOssResponseList = async (res, account) => {
         url: res.url,
         account,
         timestamp: new Date().valueOf(),
+        maxAge,
     };
     const responseList = uniqBy([...ossData.responseList, response].reverse(), (item) => item.account + ' ' + item.url);
     return updateOssData({
@@ -128,6 +129,7 @@ const toRecord = (headers) => {
 };
 const toFetch = async (request, account, op) => {
     const isForce = op?.isForce ?? false;
+    const maxAge = op?.maxAge ?? 10 * 1000;
     const withCertification = op?.withCertification ?? true;
     const fullUrl = DOMAIN + request.rawPath;
     const ossData = await getOssData();
@@ -147,7 +149,7 @@ const toFetch = async (request, account, op) => {
             res.text = () => {
                 return Promise.resolve(body);
             };
-            await updateOssResponseList(res, '*');
+            await updateOssResponseList(res, '*', maxAge);
             await updateOssGlobalCookie(res);
             return res;
         }
@@ -185,7 +187,7 @@ const toFetch = async (request, account, op) => {
         });
     }
     const matchedCacheResponse = await getOssResponse(request, account);
-    const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10 * 1000;
+    const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
     const isValidAccount = ossData.accountList.some((ac) => ac.account === account);
     if (!withCertification) {
         const res = await fetch(fullUrl, {
@@ -208,7 +210,7 @@ const toFetch = async (request, account, op) => {
         });
         const body = await res.text();
         res.text = () => Promise.resolve(body);
-        await updateOssResponseList(res, account || '*');
+        await updateOssResponseList(res, account || '*', maxAge);
         return new Response(body, {
             headers: {
                 ...toRecord(res.headers),
@@ -293,10 +295,10 @@ const handleSetting = async (request, response) => {
         const res2 = new Response(body, {
             headers: matchedCacheResponse.headers,
         });
-        await updateOssResponseList(res2, request.cookie.account);
+        await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
         return false;
     }
-    const res = await toFetch(request, request.cookie.account ?? '*');
+    const res = await toFetch(request, request.cookie.account ?? '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
