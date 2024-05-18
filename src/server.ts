@@ -3,6 +3,20 @@ import { URL } from 'url';
 import { ParsedRequest, ParsedResponse } from './type';
 import { Cookie } from './cookie';
 
+type OSSData = {
+  accountList: { account: string; password: string; token: string }[];
+  globalCookie: {
+    session_id: string;
+  };
+  responseList: {
+    body: string;
+    url: string;
+    headers: { [k: string]: string };
+    timestamp: number;
+    account: string;
+  }[];
+};
+
 const client = new OSS({
   // yourRegion填写Bucket所在地域。以华东1（杭州）为例，Region填写为oss-cn-hangzhou。
   region: 'oss-cn-hangzhou',
@@ -28,19 +42,7 @@ function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
   return reItemList;
 }
 
-type OSSData = {
-  accountList: { account: string; password: string; token: string }[];
-  globalCookie: {
-    session_id: string;
-  };
-  responseList: {
-    body: string;
-    url: string;
-    headers: { [k: string]: string };
-    timestamp: number;
-    account: string;
-  }[];
-};
+
 
 const getOssData = async (): Promise<OSSData> => {
   let ossRes: any = void 0;
@@ -304,10 +306,10 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     return true;
   }
   if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-    const res = await toFetch(req, { isCache: false });
+    const res = await toFetch(req, { isCache: false, withCertification:false });
     const data = await res.text();
-    response.statusCode = 200;
-    response.headers['Content-Type'] = 'text/html;charset=UTF-8';
+    response.statusCode = res.status;
+    response.headers = toRecord(res.headers);
     response.body = data;
     return false;
   }

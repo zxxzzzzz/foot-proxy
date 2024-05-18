@@ -283,10 +283,10 @@ const handleStatic = async (req, response) => {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await toFetch(req, { isCache: false });
+        const res = await toFetch(req, { isCache: false, withCertification: false });
         const data = await res.text();
-        response.statusCode = 200;
-        response.headers['Content-Type'] = 'text/html;charset=UTF-8';
+        response.statusCode = res.status;
+        response.headers = toRecord(res.headers);
         response.body = data;
         return false;
     }
