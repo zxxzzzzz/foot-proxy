@@ -129,7 +129,6 @@ const updateOssAccount = async (account: string, token: string) => {
 const toRecord = (headers: Headers) => {
   const _headers: { [k: string]: string } = {};
   headers.forEach((v, k) => {
-    if (k.toLowerCase() === 'content-length') return;
     _headers[k] = v;
   });
   return _headers;
@@ -176,12 +175,24 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
     }
     const token = `${new Date().valueOf()}`;
     const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
+    if (!matchedCacheResponse) {
+      return new Response('{"success":false,"error":"主账号未登录"}', {
+        status: 400,
+        statusText: 'error',
+        headers: {
+          'content-type': 'application/json',
+          'my-use-cache': '1',
+          'account-token': token,
+        },
+      });
+    }
+    await updateOssAccount(accountItem.account, token);
     return new Response(matchedCacheResponse.body, {
       status: 200,
       statusText: 'ok',
       headers: {
         ...matchedCacheResponse.headers,
-        'use-cache': '1',
+        'my-use-cache': '1',
         'account-token': token,
         'set-cookie': Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
       },
@@ -189,7 +200,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
   }
   // 其他请求处理
   const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
-  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10*1000;
+  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10 * 1000;
   const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
   if (isResponseExpired || isForce || !isValidAccount) {
     const res = await fetch(fullUrl, {
@@ -301,7 +312,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     const res = await toFetch(req, { isCache: false, withCertification: false });
     const data = await res.text();
     response.statusCode = res.status;
-    response.headers = toRecord(res.headers)
+    response.headers = toRecord(res.headers);
     response.body = data;
     return false;
   }

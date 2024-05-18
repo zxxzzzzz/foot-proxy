@@ -115,8 +115,6 @@ const updateOssAccount = async (account, token) => {
 const toRecord = (headers) => {
     const _headers = {};
     headers.forEach((v, k) => {
-        if (k.toLowerCase() === 'content-length')
-            return;
         _headers[k] = v;
     });
     return _headers;
@@ -159,12 +157,24 @@ const toFetch = async (request, op) => {
         }
         const token = `${new Date().valueOf()}`;
         const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
+        if (!matchedCacheResponse) {
+            return new Response('{"success":false,"error":"主账号未登录"}', {
+                status: 400,
+                statusText: 'error',
+                headers: {
+                    'content-type': 'application/json',
+                    'my-use-cache': '1',
+                    'account-token': token,
+                },
+            });
+        }
+        await updateOssAccount(accountItem.account, token);
         return new Response(matchedCacheResponse.body, {
             status: 200,
             statusText: 'ok',
             headers: {
                 ...matchedCacheResponse.headers,
-                'use-cache': '1',
+                'my-use-cache': '1',
                 'account-token': token,
                 'set-cookie': cookie_1.Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
             },
