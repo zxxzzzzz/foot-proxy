@@ -192,6 +192,7 @@ const toFetch = async (request, op) => {
         if (isCache) {
             await updateOssResponseList(res, cookieData.account || '');
         }
+        return res;
     }
     return new Response(matchedCacheResponse.body, {
         status: 200,
