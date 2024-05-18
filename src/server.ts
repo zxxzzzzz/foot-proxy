@@ -175,7 +175,6 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
     }
     const token = `${new Date().valueOf()}`;
     const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
-    await updateOssAccount(accountItem.account, token);
     return new Response(matchedCacheResponse.body, {
       status: 200,
       statusText: 'ok',
@@ -324,7 +323,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
   ];
   const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
-    if (['.js', '.css'].includes(matchedItem.ext)) {
+    if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
       const res = await toFetch(req, { isCache: false, withCertification: false });
       response.statusCode = res.status;
       response.headers = {
