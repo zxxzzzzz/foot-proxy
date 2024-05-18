@@ -29,7 +29,7 @@ export type ParsedRequest = {
   rawPath: string;
   body: string;
   isBase64Encoded: boolean;
-  cookie: { [k: string]: string };
+  cookie: { account: string, session_id:string, token:string };
   headers: {
     [key: string]: string;
   };

@@ -28,7 +28,7 @@ const pipe = async (
     method: request.requestContext.http.method.toLowerCase(),
     isBase64Encoded: request.isBase64Encoded,
     body: request.body,
-    cookie: cookie,
+    cookie: cookie as { account: string, session_id:string, token:string },
     headers: request.headers,
   };
 
