@@ -147,7 +147,7 @@ const toFetch = async (request, account, op) => {
             res.text = () => {
                 return Promise.resolve(body);
             };
-            await updateOssResponseList(res, loginData.account);
+            await updateOssResponseList(res, '*');
             await updateOssGlobalCookie(res);
             return res;
         }
@@ -208,7 +208,7 @@ const toFetch = async (request, account, op) => {
         });
         const body = await res.text();
         res.text = () => Promise.resolve(body);
-        await updateOssResponseList(res, account || '');
+        await updateOssResponseList(res, account || '*');
         return new Response(body, {
             headers: {
                 ...toRecord(res.headers),
