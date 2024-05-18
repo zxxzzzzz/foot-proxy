@@ -90,12 +90,16 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
   const response: OSSData['responseList'][0] = {
     body,
     headers,
-    url: res.url,
+    // @ts-expect-error hack写法
+    url: res.url ?? res._url,
     account,
     timestamp: new Date().valueOf(),
     maxAge,
   };
-  const responseList = uniqBy([...ossData.responseList, response].reverse(), (item) => item.account + ' ' + item.url);
+  const responseList = uniqBy(
+    [...ossData.responseList, response].reverse().filter((item) => item.url),
+    (item) => item.account + ' ' + item.url
+  );
   return updateOssData({
     responseList,
   });
@@ -321,6 +325,8 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
     const res2 = new Response(body, {
       headers: matchedCacheResponse.headers,
     });
+    // @ts-expect-error hack写法
+    res2._url = DOMAIN + '/api/userConfig/getMyConfig';
     await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
     return false;
   }

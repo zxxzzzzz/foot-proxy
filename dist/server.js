@@ -76,12 +76,12 @@ const updateOssResponseList = async (res, account, maxAge) => {
     const response = {
         body,
         headers,
-        url: res.url,
+        url: res.url ?? res._url,
         account,
         timestamp: new Date().valueOf(),
         maxAge,
     };
-    const responseList = uniqBy([...ossData.responseList, response].reverse(), (item) => item.account + ' ' + item.url);
+    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.account + ' ' + item.url);
     return updateOssData({
         responseList,
     });
@@ -295,6 +295,7 @@ const handleSetting = async (request, response) => {
         const res2 = new Response(body, {
             headers: matchedCacheResponse.headers,
         });
+        res2._url = DOMAIN + '/api/userConfig/getMyConfig';
         await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
         return false;
     }
