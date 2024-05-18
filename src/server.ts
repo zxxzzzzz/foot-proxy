@@ -189,7 +189,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
   }
   // 其他请求处理
   const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
-  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10;
+  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10*1000;
   const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
   if (isResponseExpired || isForce || !isValidAccount) {
     const res = await fetch(fullUrl, {
