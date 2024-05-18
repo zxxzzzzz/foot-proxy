@@ -42,8 +42,6 @@ function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
   return reItemList;
 }
 
-
-
 const getOssData = async (): Promise<OSSData> => {
   let ossRes: any = void 0;
   try {
@@ -213,7 +211,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
     if (isCache) {
       await updateOssResponseList(res, cookieData.account || '');
     }
-    return res
+    return res;
   }
   return new Response(matchedCacheResponse.body, {
     status: 200,
@@ -307,7 +305,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     return true;
   }
   if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-    const res = await toFetch(req, { isCache: false, withCertification:false });
+    const res = await toFetch(req, { isCache: false, withCertification: false });
     const data = await res.text();
     response.statusCode = res.status;
     response.headers = toRecord(res.headers);
@@ -327,7 +325,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
   const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
     if (['.js', '.css'].includes(matchedItem.ext)) {
-      const res = await toFetch(req, { isCache: false });
+      const res = await toFetch(req, { isCache: false, withCertification: false });
       response.statusCode = res.status;
       response.headers = {
         'content-type': matchedItem.type,
