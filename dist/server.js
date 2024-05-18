@@ -280,7 +280,7 @@ const handleStatic = async (req, response) => {
         const res = await toFetch(req, { isCache: false, withCertification: false });
         const data = await res.text();
         response.statusCode = res.status;
-        response.headers = toRecord(res.headers);
+        response.headers['content-type'] = 'text/html;;charset=UTF-8';
         response.body = data;
         return false;
     }
