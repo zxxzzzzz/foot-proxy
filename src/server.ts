@@ -1,6 +1,6 @@
 import OSS from 'ali-oss';
 import { URL } from 'url';
-import { ParsedRequest, ParsedResponse, Request, Response } from './type';
+import { ParsedRequest, ParsedResponse } from './type';
 import { Cookie } from './cookie';
 
 const client = new OSS({
@@ -12,174 +12,239 @@ const client = new OSS({
   bucket: 'footballc',
   internal: true,
 });
+const DOMAIN = 'http://175.27.166.226';
+const OSS_FILE_NAME = 'sync-test.json';
 
-const getOssData = async () => {
+function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
+  const idList: string[] = [];
+  const reItemList: T[] = [];
+  for (const item of itemList) {
+    const id = cb(item);
+    if (!idList.includes(id)) {
+      reItemList.push({ ...item });
+      idList.push(id);
+    }
+  }
+  return reItemList;
+}
+
+type OSSData = {
+  accountList: { account: string; password: string; token: string }[];
+  globalCookie: {
+    session_id: string;
+  };
+  responseList: {
+    body: string;
+    url: string;
+    headers: { [k: string]: string };
+    timestamp: number;
+    account: string;
+  }[];
+};
+
+const getOssData = async (): Promise<OSSData> => {
   let ossRes: any = void 0;
   try {
     ossRes = await client.get(OSS_FILE_NAME);
   } catch (error) {
     return {
       accountList: [],
-      loginResponse: {
-        headers: { 'Set-Cookie': [], Date: '' },
-        body: '',
+      globalCookie: {
+        session_id: '',
       },
+      responseList: [],
     };
   }
-  const syncData = JSON.parse(ossRes?.content || '{}');
-  return syncData as {
-    accountList: { account: string; password: string; token: string }[];
-    loginResponse: {
-      headers: { 'Set-Cookie': string[]; Date: string };
-      body: string;
-    };
-  };
+  const syncData = JSON.parse(
+    ossRes?.content ||
+      `{
+          "accountList": [],
+          "globalCookie":{"session_id":""},
+          "responseList": [],
+      }`
+  );
+  return syncData;
 };
-const setOssData = async (data: {
-  accountList?: { account: string; password: string; token: string }[];
-  loginResponse?: {
-    headers?: { 'Set-Cookie': string[]; Date: string };
-    body?: string;
-  };
-}) => {
+const setOssData = async (data: Partial<OSSData>) => {
   const ossData = await getOssData();
   const accountList = data.accountList || ossData.accountList;
-  const headers = data.loginResponse?.headers || ossData.loginResponse.headers;
-  const body = data.loginResponse?.body || ossData.loginResponse.body;
+  const responseList = data.responseList || ossData.responseList || [];
+  const globalCookie = data.globalCookie || ossData.globalCookie || { session_id: '' };
   try {
-    const putData = { accountList, loginResponse: { headers, body } };
+    const putData: OSSData = { accountList, responseList, globalCookie };
     await client.put(OSS_FILE_NAME, Buffer.from(JSON.stringify(putData)));
   } catch (error) {
     console.log('put error', error);
   }
 };
-
-const toFetch = async (request: ParsedRequest) => {
-  const fullUrl = DOMAIN + request.rawPath;
+const updateOssResponseList = async (res: Response, account: string) => {
+  if (res.status !== 200) return;
   const ossData = await getOssData();
+  const headers: { [k: string]: string } = {};
+  res.headers.forEach((v, k) => {
+    headers[k] = v;
+  });
+  const body = await res.text();
+  const response: OSSData['responseList'][0] = {
+    body,
+    headers,
+    url: res.url,
+    account,
+    timestamp: new Date().valueOf(),
+  };
+  const responseList = uniqBy([...ossData.responseList, response].reverse(), (item) => item.account + ' ' + item.url);
+  return setOssData({
+    responseList,
+  });
+};
+
+const updateOssGlobalCookie = async (res: Response) => {
+  if (res.status !== 200) return;
+  const ossData = await getOssData();
+  const session_id = Cookie.parseSetCookie(res.headers.getSetCookie() || [])?.session_id;
+  return setOssData({
+    globalCookie: {
+      ...ossData.globalCookie,
+      session_id,
+    },
+  });
+};
+const updateOssAccount = async (account: string, token: string) => {
+  const ossData = await getOssData();
+  const accountList = ossData.accountList || [];
+  setOssData({
+    accountList: accountList.map((item) => {
+      if (item.account === account) {
+        return {
+          ...item,
+          token,
+        };
+      }
+      return item;
+    }),
+  });
+};
+
+const toRecord = (headers: Headers) => {
+  const _headers: { [k: string]: string } = {};
+  headers.forEach((v, k) => {
+    _headers[k] = v;
+  });
+  return _headers;
+};
+
+// mock正常返回数据
+const toFetch = async (request: ParsedRequest, isForce: boolean = false, isCache: boolean = true) => {
+  const fullUrl = DOMAIN + request.rawPath;
   const cookieData = request.Cookie;
-  const session_id = cookieData.session_id || '';
+  const ossData = await getOssData();
   const isLogin = fullUrl.endsWith('/api/users/login');
-  let account = '';
-  if (cookieData.account) {
-    account = cookieData.account;
-  }
+  // 登录请求的处理
   if (isLogin) {
     const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
-    account = loginData.account;
-  }
-  const res = await fetch(fullUrl, {
-    headers: {
-      ...request.headers,
-      cookie: `session_id=${session_id}`,
-    },
-    body: ['get', 'head'].includes(request.method) ? null : request.body,
-    method: request.method,
-  });
-  const isPublicAccount = !ossData.accountList.some((ac) => ac.account === account) && account;
-  if (!isPublicAccount) return res;
-  const cookieToSet = res.headers.getSetCookie();
-  if (!cookieToSet?.length) return res;
-  if (isLogin) {
-    const body = await res.text();
-    await setOssData({
-      loginResponse: {
-        headers: { 'Set-Cookie': cookieToSet, Date: res.headers.get('Date') || '' },
-        body,
+    const isMainAccount = !ossData.accountList.some((ac) => ac.account === loginData.account);
+    if (isMainAccount) {
+      const res = await fetch(fullUrl, {
+        headers: {
+          ...request.headers,
+        },
+        body: ['get', 'head'].includes(request.method) ? null : request.body,
+        method: request.method,
+      });
+      const body = await res.text();
+      res.text = () => {
+        return Promise.resolve(body);
+      };
+      await updateOssResponseList(res, loginData.account);
+      await updateOssGlobalCookie(res);
+      return res;
+    }
+    // 副号登录
+    const accountItem = ossData.accountList.find((ac) => ac.account === loginData.account && ac.password === loginData.password);
+    if (!accountItem) {
+      return new Response('{"success":false,"error":"该内部账号密码不正确"}', {
+        status: 400,
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+    }
+    const token = `${new Date().valueOf()}`;
+    const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
+    await updateOssAccount(accountItem.account, token);
+    return new Response(matchedCacheResponse.body, {
+      status: 200,
+      statusText: 'ok',
+      headers: {
+        ...matchedCacheResponse.headers,
+        'use-cache': '1',
+        'account-token': token,
+        'set-cookie': Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
       },
     });
+  }
+  // 其他请求处理
+  const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
+  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10;
+  const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
+  if (!isValidAccount) {
+    return new Response('{"success":false,"error":"该内部账号不存在"}', {
+      status: 400,
+      headers: {
+        'content-type': 'application/json',
+      },
+    });
+  }
+  if (isResponseExpired || isForce) {
+    const res = await fetch(fullUrl, {
+      headers: {
+        ...request.headers,
+      },
+      body: ['get', 'head'].includes(request.method) ? null : request.body,
+      method: request.method,
+    });
+    const body = await res.text();
     res.text = () => {
       return Promise.resolve(body);
     };
-    return res;
+    if (isCache) {
+      await updateOssResponseList(res, cookieData.account || '');
+    }
   }
-  await setOssData({
-    loginResponse: {
-      headers: { 'Set-Cookie': cookieToSet, Date: res.headers.get('Date') || '' },
+  return new Response(matchedCacheResponse.body, {
+    status: 200,
+    statusText: 'ok',
+    headers: {
+      ...matchedCacheResponse.headers,
+      'use-cache': '1',
     },
   });
-  return res;
 };
 
-const DOMAIN = 'http://175.27.166.226';
-const OSS_FILE_NAME = 'sync.json';
 
 export const handleLogin = async (request: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + request.rawPath;
   if (!fullUrl.endsWith('/api/users/login')) return true;
-  const syncData = await getOssData();
   const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
-  const loginResponse = syncData?.loginResponse;
-  const accountList = syncData?.accountList || [];
-  const loginRes = await toFetch(request);
-  response.headers['Content-Type'] = 'application/json; charset=utf-8';
-  // 主号登录
-  if (loginRes.status === 200) {
-    const text = await loginRes.text();
-    const cookieToSet = loginRes.headers.getSetCookie();
-    response.statusCode = 200;
-    response['Set-Cookie'] = {
-      ...Cookie.parseSetCookie(cookieToSet),
-      account: loginData.account,
-    };
-    response.body = text;
-    return false
-  }
-  // 副号登录
-  if (!accountList?.length) {
-    response.statusCode = 400;
-    response.body = '{"success":false,"error":"未配置内部账号"}';
-    return false;
-  }
-  const accountItem = accountList.find((item) => item.account === loginData.account);
-  if (!accountItem) {
-    response.statusCode = 400;
-    response.body = '{"success":false,"error":"该内部账号不存在"}';
-    return false;
-  }
-  if (accountItem.password !== loginData.password) {
-    response.statusCode = 400;
-    response.body = '{"success":false,"error":"该内部账号密码不正确"}';
-    return false;
-  }
-  if (!loginResponse) {
-    response.statusCode = 400;
-    response.body = '{"success":false,"error":"外部账号未登录,所以内部账号无法使用"}';
-    return false;
-  }
-  const token = `${new Date().valueOf()}`;
-  response.statusCode = 200;
-  response['Set-Cookie'] = {
-    ...Cookie.parseSetCookie(loginResponse?.headers?.['Set-Cookie']),
+  const res = await toFetch(request);
+  response.statusCode = res.status;
+  response.headers = toRecord(res.headers);
+  response.body = await res.text();
+  response.isBase64Encoded = false;
+  response['Set-Cookie'] = response['Set-Cookie'] = {
+    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: loginData.account,
-    token,
+    token: res.headers.get('account-token') || '',
   };
-  response.headers['Date'] = loginResponse.headers['Date'];
-  response.body = loginResponse.body || '';
-  try {
-    setOssData({
-      accountList: accountList.map((item) => {
-        if (item.account === loginData.account) {
-          return {
-            ...item,
-            token,
-          };
-        }
-        return item;
-      }),
-    });
-  } catch (error) {
-    console.log('put error', error);
-  }
   return false;
 };
 // http://175.27.166.226/api/users/logout
-export const handleLogout = async (req: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + req.rawPath;
+export const handleLogout = async (request: ParsedRequest, response: ParsedResponse) => {
+  const fullUrl = DOMAIN + request.rawPath;
   if (!fullUrl.endsWith('/api/users/logout')) return true;
   const syncData = await getOssData();
   const accountList = syncData?.accountList || [];
-  const cookieData = req.Cookie;
+  const cookieData = request.Cookie;
   const account = cookieData?.account;
   if (accountList.some((item) => item.account === account)) {
     response.statusCode = 200;
@@ -204,12 +269,12 @@ export const handleLogout = async (req: ParsedRequest, response: ParsedResponse)
     return false;
   }
   // 外部账号登出
-  const res = await toFetch(req);
+  const res = await toFetch(request, true);
   const text = await res.text();
   response.statusCode = res.status;
   response.headers['content-type'] = 'application/json;charset=UTF-8';
   response['Set-Cookie'] = {
-    account: req.Cookie.account || '',
+    account: request.Cookie.account || '',
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),
   };
   response.body = text;
@@ -217,38 +282,18 @@ export const handleLogout = async (req: ParsedRequest, response: ParsedResponse)
 };
 
 // 其他请求全部透传
-export const handleOtherApi = async (req: ParsedRequest, response: ParsedResponse) => {
-  let ossRes: any = void 0;
-  try {
-    ossRes = await client.get(OSS_FILE_NAME);
-  } catch (error) {}
-  const syncData = await getOssData();
-  const ossAccountList = syncData?.accountList || [];
-  const cookieData = req.Cookie;
-  const cookieAccount = cookieData?.account;
-  const cookieToken = cookieData?.token;
-
-  const res = await toFetch(req);
-  const text = await res.text();
-  const accountItem = ossAccountList.find((item) => item.account === cookieAccount);
-
-  response.headers['content-type'] = 'application/json;charset=UTF-8';
+export const handleOtherApi = async (request: ParsedRequest, response: ParsedResponse) => {
+  const res = await toFetch(request);
+  response.headers = toRecord(res.headers);
   response['Set-Cookie'] = {
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),
-    account: req.Cookie.account || '',
-    token: req.Cookie.token || '',
+    account: request.Cookie.account || '',
+    token: request.Cookie.token || '',
   };
-  if (accountItem && accountItem.token !== cookieToken && accountItem.token) {
-    response.statusCode = 400;
-    response.body = '';
-    return false;
-  }
-  response.statusCode = res.status === 405 ? 400 : res.status;
-  if (response.statusCode !== 200) {
-    response.body = JSON.stringify({ ...JSON.parse(text), cookie: req.Cookie, header: req.headers });
-    return false;
-  }
-  response.body = text;
+  response.statusCode = res.status;
+  response.isBase64Encoded = false;
+  response.body = await res.text();
+
   return false;
 };
 
@@ -259,7 +304,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     return true;
   }
   if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-    const res = await toFetch(req);
+    const res = await toFetch(req, true, false);
     const data = await res.text();
     response.statusCode = 200;
     response.headers['Content-Type'] = 'text/html;charset=UTF-8';
@@ -279,7 +324,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
   const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
     if (['.js', '.woff', '.ttf', '.css'].includes(matchedItem.ext)) {
-      const res = await toFetch(req);
+      const res = await toFetch(req, true, false);
       response.statusCode = res.status;
       response.headers = {
         'content-type': matchedItem.type,

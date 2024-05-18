@@ -1,6 +1,6 @@
 
 edition: 3.0.0
-name: foot-proxy
+name: foot-proxy-test
 access: "default"
 
 resources:
@@ -8,14 +8,14 @@ resources:
     component: fc3
     props: # 组件的属性值
       region: cn-hangzhou # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
-      functionName: proxy
+      functionName: proxy-test
       runtime: nodejs20
       code: ./dist
       cpu: 1
       handler: index.data
       memorySize: 1024
       diskSize: 512
-      description: 'proxy'
+      description: 'proxy test'
       timeout: 60
       instanceConcurrency: 1
       triggers:
@@ -34,7 +34,7 @@ resources:
       protocol: HTTP # HTTP | HTTPS 
       routeConfig:
         routes:
-          - functionName: proxy
+          - functionName: proxy-test
             methods:
               - POST
               - GET
