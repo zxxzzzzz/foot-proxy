@@ -310,7 +310,7 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
     // 更新getMyConfig缓存请求
     const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account);
     if (!matchedCacheResponse) return;
-    const body = JSON.stringify({ ...JSON.parse(matchedCacheResponse.body), ...JSON.parse(response.body) });
+    const body = JSON.stringify({ ...JSON.parse(matchedCacheResponse.body), ...JSON.parse(request.body) });
     const res2 = new Response(body, {
       headers: matchedCacheResponse.headers,
     });
