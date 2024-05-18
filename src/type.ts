@@ -29,7 +29,7 @@ export type ParsedRequest = {
   rawPath: string;
   body: string;
   isBase64Encoded: boolean;
-  Cookie: { [k: string]: string };
+  cookie: { [k: string]: string };
   headers: {
     [key: string]: string;
   };
@@ -46,7 +46,7 @@ export type Response = {
 };
 export type ParsedResponse = {
   statusCode: number;
-  'Set-Cookie': { [key: string]: string };
+  setCookie: { [key: string]: string };
   headers: {
     [key: string]: string;
   };

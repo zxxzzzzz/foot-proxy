@@ -72,6 +72,7 @@ const updateOssResponseList = async (res, account) => {
         headers[k] = v;
     });
     const body = await res.text();
+    res.text = () => Promise.resolve(body);
     const response = {
         body,
         headers,
@@ -118,9 +119,12 @@ const toRecord = (headers) => {
     });
     return _headers;
 };
-const toFetch = async (request, isForce = false, isCache = true) => {
+const toFetch = async (request, op) => {
+    const isForce = op?.isForce ?? false;
+    const isCache = op?.isCache ?? true;
+    const withCertification = op?.withCertification ?? true;
     const fullUrl = DOMAIN + request.rawPath;
-    const cookieData = request.Cookie;
+    const cookieData = request.cookie;
     const ossData = await getOssData();
     const isLogin = fullUrl.endsWith('/api/users/login');
     if (isLogin) {
@@ -168,7 +172,7 @@ const toFetch = async (request, isForce = false, isCache = true) => {
     const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
     const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10;
     const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
-    if (!isValidAccount) {
+    if (!isValidAccount && withCertification) {
         return new Response('{"success":false,"error":"该内部账号不存在"}', {
             status: 400,
             headers: {
@@ -180,14 +184,11 @@ const toFetch = async (request, isForce = false, isCache = true) => {
         const res = await fetch(fullUrl, {
             headers: {
                 ...request.headers,
+                cookie: withCertification ? `session_id=${request.cookie.session_id}` : '',
             },
             body: ['get', 'head'].includes(request.method) ? null : request.body,
             method: request.method,
         });
-        const body = await res.text();
-        res.text = () => {
-            return Promise.resolve(body);
-        };
         if (isCache) {
             await updateOssResponseList(res, cookieData.account || '');
         }
@@ -211,7 +212,7 @@ const handleLogin = async (request, response) => {
     response.headers = toRecord(res.headers);
     response.body = await res.text();
     response.isBase64Encoded = false;
-    response['Set-Cookie'] = response['Set-Cookie'] = {
+    response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: loginData.account,
         token: res.headers.get('account-token') || '',
@@ -225,12 +226,12 @@ const handleLogout = async (request, response) => {
         return true;
     const syncData = await getOssData();
     const accountList = syncData?.accountList || [];
-    const cookieData = request.Cookie;
+    const cookieData = request.cookie;
     const account = cookieData?.account;
     if (accountList.some((item) => item.account === account)) {
         response.statusCode = 200;
         response.headers['content-type'] = 'application/json;charset=UTF-8';
-        response['Set-Cookie'] = {
+        response.setCookie = {
             session_id: '',
             account: '',
             token: '',
@@ -249,12 +250,12 @@ const handleLogout = async (request, response) => {
         });
         return false;
     }
-    const res = await toFetch(request, true);
+    const res = await toFetch(request, { isForce: true });
     const text = await res.text();
     response.statusCode = res.status;
     response.headers['content-type'] = 'application/json;charset=UTF-8';
-    response['Set-Cookie'] = {
-        account: request.Cookie.account || '',
+    response.setCookie = {
+        account: request.cookie.account || '',
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
     };
     response.body = text;
@@ -264,10 +265,10 @@ exports.handleLogout = handleLogout;
 const handleOtherApi = async (request, response) => {
     const res = await toFetch(request);
     response.headers = toRecord(res.headers);
-    response['Set-Cookie'] = {
+    response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
-        account: request.Cookie.account || '',
-        token: request.Cookie.token || '',
+        account: request.cookie.account || '',
+        token: request.cookie.token || '',
     };
     response.statusCode = res.status;
     response.isBase64Encoded = false;
@@ -282,7 +283,7 @@ const handleStatic = async (req, response) => {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await toFetch(req, true, false);
+        const res = await toFetch(req, { isCache: false });
         const data = await res.text();
         response.statusCode = 200;
         response.headers['Content-Type'] = 'text/html;charset=UTF-8';
@@ -301,8 +302,8 @@ const handleStatic = async (req, response) => {
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
-        if (['.js', '.woff', '.ttf', '.css'].includes(matchedItem.ext)) {
-            const res = await toFetch(req, true, false);
+        if (['.js', '.css'].includes(matchedItem.ext)) {
+            const res = await toFetch(req, { isCache: false });
             response.statusCode = res.status;
             response.headers = {
                 'content-type': matchedItem.type,
