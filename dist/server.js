@@ -163,7 +163,7 @@ const toFetch = async (request, op) => {
                 statusText: 'error',
                 headers: {
                     'content-type': 'application/json',
-                    'my-use-cache': '1',
+                    'my-use-cache': '0',
                     'account-token': token,
                 },
             });
@@ -203,7 +203,7 @@ const toFetch = async (request, op) => {
         statusText: 'ok',
         headers: {
             ...matchedCacheResponse.headers,
-            'use-cache': '1',
+            'my-use-cache': '1',
         },
     });
 };
