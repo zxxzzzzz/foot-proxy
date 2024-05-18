@@ -181,7 +181,6 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
         statusText: 'error',
         headers: {
           'content-type': 'application/json',
-          'my-use-cache': '0',
           'account-token': token,
         },
       });
@@ -192,7 +191,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
       statusText: 'ok',
       headers: {
         ...matchedCacheResponse.headers,
-        'my-use-cache': '1',
+        'is-cache': 'true',
         'account-token': token,
         'set-cookie': Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
       },
@@ -230,7 +229,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
     return new Response(body, {
       headers: {
         ...toRecord(res.headers),
-        'is-cache': '0',
+        'is-cache': 'false',
         'is-response-expired': `${isResponseExpired}`,
         'is-force': `${isForce}`,
       },
@@ -241,7 +240,7 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
     statusText: 'ok',
     headers: {
       ...matchedCacheResponse.headers,
-      'my-use-cache': '1',
+      'is-cache': 'true',
     },
   });
 };

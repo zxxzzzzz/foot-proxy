@@ -26,6 +26,7 @@ resources:
             methods:
               - GET
               - POST
+              - PUT
   fc-domain: #  服务名称
     component: fc3-domain
     props: #  组件的属性值
@@ -38,5 +39,6 @@ resources:
             methods:
               - POST
               - GET
+              - PUT
             path: /*
             qualifier: LATEST
