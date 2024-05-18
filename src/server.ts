@@ -319,9 +319,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
     if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
       const res = await toFetch(req, { isCache: false, withCertification: false });
       response.statusCode = res.status;
-      response.headers = {
-        'content-type': matchedItem.type,
-      };
+      response.headers = toRecord(res.headers)
       response.isBase64Encoded = matchedItem.isBase64Encoded;
       if (matchedItem.isBase64Encoded) {
         const b = await res.arrayBuffer();
