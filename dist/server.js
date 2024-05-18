@@ -188,7 +188,6 @@ const toFetch = async (request, op) => {
             headers: {
                 ...request.headers,
                 cookie: withCertification ? `session_id=${request.cookie.session_id}` : '',
-                isResponseExpired: `${isResponseExpired}`,
             },
             body: ['get', 'head'].includes(request.method) ? null : request.body,
             method: request.method,
@@ -196,6 +195,9 @@ const toFetch = async (request, op) => {
         if (isCache) {
             await updateOssResponseList(res, cookieData.account || '');
         }
+        res.headers.append('is-cache', '0');
+        res.headers.append('is-response-expired', `${isResponseExpired}`);
+        res.headers.append('is-force', `${isForce}`);
         return res;
     }
     return new Response(matchedCacheResponse.body, {
