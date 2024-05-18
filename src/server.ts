@@ -202,22 +202,39 @@ const toFetch = async (request: ParsedRequest, op?: { isForce?: boolean; isCache
   const matchedCacheResponse = ossData.responseList.find((res) => res.url === fullUrl);
   const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > 10 * 1000;
   const isValidAccount = ossData.accountList.some((ac) => ac.account === cookieData.account);
-  if (isResponseExpired || isForce || !isValidAccount) {
+  // 不用认证的请求，直接透传
+  if (!withCertification) {
     const res = await fetch(fullUrl, {
       headers: {
         ...request.headers,
-        cookie: withCertification ? `session_id=${request.cookie.session_id}` : '',
       },
       body: ['get', 'head'].includes(request.method) ? null : request.body,
       method: request.method,
     });
+    return res;
+  }
+  if (isResponseExpired || isForce || !isValidAccount) {
+    const res = await fetch(fullUrl, {
+      headers: {
+        ...request.headers,
+        cookie: `session_id=${request.cookie.session_id}`,
+      },
+      body: ['get', 'head'].includes(request.method) ? null : request.body,
+      method: request.method,
+    });
+    const body = await res.text();
+    res.text = () => Promise.resolve(body);
     if (isCache) {
       await updateOssResponseList(res, cookieData.account || '');
     }
-    res.headers.append('is-cache', '0');
-    res.headers.append('is-response-expired', `${isResponseExpired}`);
-    res.headers.append('is-force', `${isForce}`);
-    return res;
+    return new Response(body, {
+      headers: {
+        ...toRecord(res.headers),
+        'is-cache': '0',
+        'is-response-expired': `${isResponseExpired}`,
+        'is-force': `${isForce}`,
+      },
+    });
   }
   return new Response(matchedCacheResponse.body, {
     status: 200,
