@@ -1,5 +1,5 @@
 import { ParsedRequest, ParsedResponse, Request, Response } from './type';
-import { handleLogin, handleLogout, handleOtherApi, handleStatic } from './server';
+import { handleLogin, handleLogout, handleOtherApi, handleStatic, handleSetting } from './server';
 import { Cookie } from './cookie';
 
 const pipe = async (
@@ -28,7 +28,7 @@ const pipe = async (
     method: request.requestContext.http.method.toLowerCase(),
     isBase64Encoded: request.isBase64Encoded,
     body: request.body,
-    cookie: cookie as { account: string, session_id:string, token:string },
+    cookie: cookie as { account: string; session_id: string; token: string },
     headers: request.headers,
   };
 
@@ -40,7 +40,7 @@ const pipe = async (
   } catch (error) {
     callback(null, { statusCode: 400, body: (error as Error).stack || '', isBase64Encoded: false, headers: {} });
   }
-  const statusCode = parsedResponse.statusCode === 405 ? 400 : parsedResponse.statusCode
+  const statusCode = parsedResponse.statusCode === 405 ? 400 : parsedResponse.statusCode;
   if (!parsedResponse.setCookie || !Object.keys(parsedResponse.setCookie).length) {
     callback(null, {
       statusCode,
@@ -60,5 +60,5 @@ const pipe = async (
 };
 
 export const data = (_event: string, content: string, callback: (_: null, res: Response) => void) => {
-  pipe(_event, content, callback, [handleStatic, handleLogin, handleLogout, handleOtherApi]);
+  pipe(_event, content, callback, [handleStatic, handleLogin, handleLogout, handleSetting, handleOtherApi]);
 };

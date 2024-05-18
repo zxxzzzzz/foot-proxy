@@ -291,7 +291,7 @@ export const handleLogout = async (request: ParsedRequest, response: ParsedRespo
 
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/getMyConfig
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/update/db61981b-34de-4c19-946f-1824afc9c5b0
-const handleSetting = async (request: ParsedRequest, response: ParsedResponse) => {
+export const handleSetting = async (request: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + request.rawPath;
   const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
   const isUpdateConfig = fullUrl.includes('/api/userConfig/update');
