@@ -77,11 +77,11 @@ const updateOssResponseList = async (res, account, maxAge) => {
         body,
         headers,
         url: res.url ?? res._url,
-        account: account || '*',
+        matchedAccount: account || '*',
         timestamp: new Date().valueOf(),
         maxAge,
     };
-    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.account + ' ' + item.url);
+    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + ' ' + item.url);
     return updateOssData({
         responseList,
     });
@@ -90,7 +90,7 @@ const getOssResponse = async (request, account) => {
     const fullUrl = DOMAIN + request.rawPath;
     const ossData = await getOssData();
     return ossData.responseList.find((res) => {
-        return res.url === fullUrl && (res.account === '*' || res.account === account);
+        return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
     });
 };
 const updateOssGlobalCookie = async (res) => {
@@ -127,7 +127,7 @@ const toRecord = (headers) => {
     });
     return _headers;
 };
-const toFetch = async (request, account, op) => {
+const toFetch = async (request, matchAccount, op) => {
     const isForce = op?.isForce ?? false;
     const maxAge = op?.maxAge ?? 10 * 1000;
     const withCertification = op?.withCertification ?? true;
@@ -163,7 +163,7 @@ const toFetch = async (request, account, op) => {
             });
         }
         const token = `${new Date().valueOf()}`;
-        const matchedCacheResponse = await getOssResponse(request, account);
+        const matchedCacheResponse = await getOssResponse(request, matchAccount);
         if (!matchedCacheResponse) {
             return new Response('{"success":false,"error":"主账号未登录"}', {
                 status: 400,
@@ -186,9 +186,9 @@ const toFetch = async (request, account, op) => {
             },
         });
     }
-    const matchedCacheResponse = await getOssResponse(request, account);
+    const matchedCacheResponse = await getOssResponse(request, matchAccount);
     const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
-    const accountItem = ossData.accountList.find((ac) => ac.account === account);
+    const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
     const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
     if (!withCertification) {
         const res = await fetch(fullUrl, {
@@ -220,7 +220,7 @@ const toFetch = async (request, account, op) => {
         });
         const body = await res.text();
         res.text = () => Promise.resolve(body);
-        await updateOssResponseList(res, account || '*', maxAge);
+        await updateOssResponseList(res, matchAccount || '*', maxAge);
         return new Response(body, {
             status: res.status,
             statusText: res.statusText,

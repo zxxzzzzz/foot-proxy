@@ -14,7 +14,7 @@ type OSSData = {
     headers: { [k: string]: string };
     timestamp: number;
     maxAge: number;
-    account: string;
+    matchedAccount: string;
   }[];
 };
 
@@ -92,13 +92,13 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     headers,
     // @ts-expect-error hack写法
     url: res.url ?? res._url,
-    account: account || '*',
+    matchedAccount: account || '*',
     timestamp: new Date().valueOf(),
     maxAge,
   };
   const responseList = uniqBy(
     [...ossData.responseList, response].reverse().filter((item) => item.url),
-    (item) => item.account + ' ' + item.url
+    (item) => item.matchedAccount + ' ' + item.url
   );
   return updateOssData({
     responseList,
@@ -108,7 +108,7 @@ const getOssResponse = async (request: ParsedRequest, account: string) => {
   const fullUrl = DOMAIN + request.rawPath;
   const ossData = await getOssData();
   return ossData.responseList.find((res) => {
-    return res.url === fullUrl && (res.account === '*' || res.account === account);
+    return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
   });
 };
 
@@ -150,7 +150,7 @@ const toRecord = (headers: Headers) => {
 // mock正常返回数据
 const toFetch = async (
   request: ParsedRequest,
-  account: string,
+  matchAccount: string,
   op?: { isForce?: boolean; withCertification?: boolean; maxAge?: number }
 ) => {
   const isForce = op?.isForce ?? false;
@@ -190,7 +190,7 @@ const toFetch = async (
       });
     }
     const token = `${new Date().valueOf()}`;
-    const matchedCacheResponse = await getOssResponse(request, account);
+    const matchedCacheResponse = await getOssResponse(request, matchAccount);
     if (!matchedCacheResponse) {
       return new Response('{"success":false,"error":"主账号未登录"}', {
         status: 400,
@@ -214,9 +214,9 @@ const toFetch = async (
     });
   }
   // 其他请求处理
-  const matchedCacheResponse = await getOssResponse(request, account);
+  const matchedCacheResponse = await getOssResponse(request, matchAccount);
   const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
-  const accountItem = ossData.accountList.find((ac) => ac.account === account);
+  const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
   const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
   // 不用认证的请求，直接透传
   if (!withCertification) {
@@ -249,7 +249,7 @@ const toFetch = async (
     });
     const body = await res.text();
     res.text = () => Promise.resolve(body);
-    await updateOssResponseList(res, account || '*', maxAge);
+    await updateOssResponseList(res, matchAccount || '*', maxAge);
     return new Response(body, {
       status: res.status,
       statusText: res.statusText,
