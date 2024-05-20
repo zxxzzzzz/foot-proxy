@@ -77,7 +77,7 @@ const updateOssResponseList = async (res, account, maxAge) => {
         body,
         headers,
         url: res.url ?? res._url,
-        account,
+        account: account || '*',
         timestamp: new Date().valueOf(),
         maxAge,
     };

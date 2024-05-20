@@ -92,7 +92,7 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     headers,
     // @ts-expect-error hack写法
     url: res.url ?? res._url,
-    account,
+    account: account || '*',
     timestamp: new Date().valueOf(),
     maxAge,
   };
@@ -217,6 +217,7 @@ const toFetch = async (
   const matchedCacheResponse = await getOssResponse(request, account);
   const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
   const isValidAccount = ossData.accountList.some((ac) => ac.account === account);
+  const isTokenExpired = !ossData.accountList.some((ac) => ac.account === account && ac.token === request?.cookie?.token);
   // 不用认证的请求，直接透传
   if (!withCertification) {
     const res = await fetch(fullUrl, {
@@ -227,6 +228,15 @@ const toFetch = async (
       method: request.method,
     });
     return res;
+  }
+  if (isTokenExpired && isValidAccount) {
+    return new Response('{"success":false,"error":"请重新登录"}', {
+      status: 400,
+      statusText: 'error',
+      headers: {
+        'content-type': 'application/json',
+      },
+    });
   }
   if (isResponseExpired || isForce || !isValidAccount) {
     const res = await fetch(fullUrl, {
