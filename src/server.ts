@@ -311,7 +311,7 @@ export const handleLogout = async (request: ParsedRequest, response: ParsedRespo
   return false;
 };
 
-const handleGetMe = async (request: ParsedRequest, response: ParsedResponse) => {
+export const handleGetMe = async (request: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = DOMAIN + request.rawPath;
   if (!fullUrl.endsWith('/api/users/getme')) return true;
   const res = await toFetch(request, '*');

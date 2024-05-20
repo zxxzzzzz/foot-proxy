@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleStatic = exports.handleOtherApi = exports.handleSetting = exports.handleLogout = exports.handleLogin = void 0;
+exports.handleStatic = exports.handleOtherApi = exports.handleSetting = exports.handleGetMe = exports.handleLogout = exports.handleLogin = void 0;
 const ali_oss_1 = __importDefault(require("ali-oss"));
 const url_1 = require("url");
 const cookie_1 = require("./cookie");
@@ -301,6 +301,7 @@ const handleGetMe = async (request, response) => {
     }
     return false;
 };
+exports.handleGetMe = handleGetMe;
 const handleSetting = async (request, response) => {
     const fullUrl = DOMAIN + request.rawPath;
     const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
