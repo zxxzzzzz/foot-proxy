@@ -244,7 +244,7 @@ const toFetch = async (
           ...request.headers,
           cookie: `session_id=${request.cookie.session_id}`,
         },
-        body: ['get', 'head'].includes(request.method) ? null : request.body || '',
+        body: ['get', 'head'].includes(request.method) ? null : request.body || null,
         method: request.method,
       });
       const body = await res.text();
@@ -389,6 +389,21 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
 // 其他请求全部透传
 export const handleOtherApi = async (request: ParsedRequest, response: ParsedResponse) => {
   const res = await toFetch(request, '*');
+  response.headers = toRecord(res.headers);
+  response.setCookie = {
+    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
+    account: request.cookie.account || '',
+    token: request.cookie.token || '',
+  };
+  response.statusCode = res.status;
+  response.isBase64Encoded = false;
+  response.body = await res.text();
+
+  return false;
+};
+export const handleDeletePut = async (request: ParsedRequest, response: ParsedResponse) => {
+  if (!['put', 'delete'].includes(request.method.toLowerCase())) return true;
+  const res = await toFetch(request, '*', { maxAge: 1 });
   response.headers = toRecord(res.headers);
   response.setCookie = {
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),

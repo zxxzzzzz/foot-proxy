@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleStatic = exports.handleOtherApi = exports.handleSetting = exports.handleGetMe = exports.handleLogout = exports.handleLogin = void 0;
+exports.handleStatic = exports.handleDeletePut = exports.handleOtherApi = exports.handleSetting = exports.handleGetMe = exports.handleLogout = exports.handleLogin = void 0;
 const ali_oss_1 = __importDefault(require("ali-oss"));
 const url_1 = require("url");
 const cookie_1 = require("./cookie");
@@ -215,7 +215,7 @@ const toFetch = async (request, matchAccount, op) => {
                     ...request.headers,
                     cookie: `session_id=${request.cookie.session_id}`,
                 },
-                body: ['get', 'head'].includes(request.method) ? null : request.body || '',
+                body: ['get', 'head'].includes(request.method) ? null : request.body || null,
                 method: request.method,
             });
             const body = await res.text();
@@ -369,6 +369,22 @@ const handleOtherApi = async (request, response) => {
     return false;
 };
 exports.handleOtherApi = handleOtherApi;
+const handleDeletePut = async (request, response) => {
+    if (!['put', 'delete'].includes(request.method.toLowerCase()))
+        return true;
+    const res = await toFetch(request, '*', { maxAge: 1 });
+    response.headers = toRecord(res.headers);
+    response.setCookie = {
+        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
+        account: request.cookie.account || '',
+        token: request.cookie.token || '',
+    };
+    response.statusCode = res.status;
+    response.isBase64Encoded = false;
+    response.body = await res.text();
+    return false;
+};
+exports.handleDeletePut = handleDeletePut;
 const handleStatic = async (req, response) => {
     const fullUrl = DOMAIN + req.rawPath;
     const parsedUrl = new url_1.URL('', fullUrl);
