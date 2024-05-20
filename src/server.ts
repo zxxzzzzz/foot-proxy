@@ -243,7 +243,7 @@ const toFetch = async (
         ...request.headers,
         cookie: `session_id=${request.cookie.session_id}`,
       },
-      body: ['get', 'head'].includes(request.method) ? null : request.body,
+      body: ['get', 'head'].includes(request.method) ? null : (request.body||''),
       method: request.method,
     });
     const body = await res.text();
