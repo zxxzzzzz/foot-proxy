@@ -2,6 +2,8 @@ import { ParsedRequest, ParsedResponse, Request, Response } from './type';
 import { handleLogin, handleLogout, handleOtherApi, handleStatic, handleSetting, handleGetMe, handleDeletePut } from './server';
 import { Cookie } from './cookie';
 
+const DOMAIN = 'http://175.27.166.226';
+
 const pipe = async (
   event: string,
   context: string,
@@ -23,6 +25,11 @@ const pipe = async (
     delete cookie.__data;
   }
 
+  const queryStr = Object.entries(request.queryParameters || {})
+    .map(([k, v]) => {
+      return `${k}=${v}`;
+    })
+    .join('&');
   const parsedRequest: ParsedRequest = {
     rawPath: request.rawPath,
     method: request.requestContext.http.method.toLowerCase(),
@@ -30,6 +37,8 @@ const pipe = async (
     body: request.body,
     cookie: cookie as { account: string; session_id: string; token: string },
     headers: request.headers,
+    queryParameters: request.queryParameters,
+    fullUrl: queryStr ? DOMAIN + request.rawPath + '?' + encodeURIComponent(queryStr) : DOMAIN + request.rawPath,
   };
 
   try {

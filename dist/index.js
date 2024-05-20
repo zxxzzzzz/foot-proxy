@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.data = void 0;
 const server_1 = require("./server");
 const cookie_1 = require("./cookie");
+const DOMAIN = 'http://175.27.166.226';
 const pipe = async (event, context, callback, funcList) => {
     const request = JSON.parse(event.toString());
     const parsedResponse = {
@@ -17,6 +18,11 @@ const pipe = async (event, context, callback, funcList) => {
         Object.assign(cookie, JSON.parse(cookie.__data || '{}'));
         delete cookie.__data;
     }
+    const queryStr = Object.entries(request.queryParameters || {})
+        .map(([k, v]) => {
+        return `${k}=${v}`;
+    })
+        .join('&');
     const parsedRequest = {
         rawPath: request.rawPath,
         method: request.requestContext.http.method.toLowerCase(),
@@ -24,6 +30,8 @@ const pipe = async (event, context, callback, funcList) => {
         body: request.body,
         cookie: cookie,
         headers: request.headers,
+        queryParameters: request.queryParameters,
+        fullUrl: queryStr ? DOMAIN + request.rawPath + '?' + encodeURIComponent(queryStr) : DOMAIN + request.rawPath,
     };
     try {
         for (const func of funcList) {

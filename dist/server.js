@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleStatic = exports.handleDeletePut = exports.handleOtherApi = exports.handleSetting = exports.handleGetMe = exports.handleLogout = exports.handleLogin = void 0;
+exports.handleStatic = exports.handleGetMatchById = exports.handleDeletePut = exports.handleOtherApi = exports.handleSetting = exports.handleGetMe = exports.handleLogout = exports.handleLogin = void 0;
 const ali_oss_1 = __importDefault(require("ali-oss"));
 const url_1 = require("url");
 const cookie_1 = require("./cookie");
@@ -14,7 +14,6 @@ const client = new ali_oss_1.default({
     bucket: 'footballc',
     internal: true,
 });
-const DOMAIN = 'http://175.27.166.226';
 const OSS_FILE_NAME = 'sync-test.json';
 function uniqBy(itemList, cb) {
     const idList = [];
@@ -87,7 +86,7 @@ const updateOssResponseList = async (res, account, maxAge) => {
     });
 };
 const getOssResponse = async (request, account) => {
-    const fullUrl = DOMAIN + request.rawPath;
+    const fullUrl = request.fullUrl;
     const ossData = await getOssData();
     return ossData.responseList.find((res) => {
         return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
@@ -131,9 +130,9 @@ const toFetch = async (request, matchAccount, op) => {
     const isForce = op?.isForce ?? false;
     const maxAge = op?.maxAge ?? 10 * 1000;
     const withCertification = op?.withCertification ?? true;
-    const fullUrl = DOMAIN + request.rawPath;
+    const fullUrl = request.fullUrl;
     const ossData = await getOssData();
-    const isLogin = fullUrl.endsWith('/api/users/login');
+    const isLogin = fullUrl.includes('/api/users/login');
     if (isLogin) {
         const loginData = JSON.parse(request.body || '{}');
         const isMainAccount = !ossData.accountList.some((ac) => ac.account === loginData.account);
@@ -253,8 +252,8 @@ const toFetch = async (request, matchAccount, op) => {
     });
 };
 const handleLogin = async (request, response) => {
-    const fullUrl = DOMAIN + request.rawPath;
-    if (!fullUrl.endsWith('/api/users/login'))
+    const fullUrl = request.fullUrl;
+    if (!fullUrl.includes('/api/users/login'))
         return true;
     const loginData = JSON.parse(request.body || '{}');
     const res = await toFetch(request, '*');
@@ -271,8 +270,8 @@ const handleLogin = async (request, response) => {
 };
 exports.handleLogin = handleLogin;
 const handleLogout = async (request, response) => {
-    const fullUrl = DOMAIN + request.rawPath;
-    if (!fullUrl.endsWith('/api/users/logout'))
+    const fullUrl = request.fullUrl;
+    if (!fullUrl.includes('/api/users/logout'))
         return true;
     const syncData = await getOssData();
     const accountList = syncData?.accountList || [];
@@ -295,8 +294,8 @@ const handleLogout = async (request, response) => {
 };
 exports.handleLogout = handleLogout;
 const handleGetMe = async (request, response) => {
-    const fullUrl = DOMAIN + request.rawPath;
-    if (!fullUrl.endsWith('/api/users/getme'))
+    const fullUrl = request.fullUrl;
+    if (!fullUrl.includes('/api/users/getme'))
         return true;
     const res = await toFetch(request, '*');
     response.headers = toRecord(res.headers);
@@ -315,7 +314,7 @@ const handleGetMe = async (request, response) => {
 };
 exports.handleGetMe = handleGetMe;
 const handleSetting = async (request, response) => {
-    const fullUrl = DOMAIN + request.rawPath;
+    const fullUrl = request.fullUrl;
     const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
     const isUpdateConfig = fullUrl.includes('/api/userConfig/update');
     if (!isGetConfig && !isUpdateConfig)
@@ -385,14 +384,31 @@ const handleDeletePut = async (request, response) => {
     return false;
 };
 exports.handleDeletePut = handleDeletePut;
-const handleStatic = async (req, response) => {
-    const fullUrl = DOMAIN + req.rawPath;
+const handleGetMatchById = async (request, response) => {
+    const fullUrl = request.fullUrl;
+    if (!fullUrl.includes('/api/matchs/getMatchById'))
+        return true;
+    const res = await toFetch(request, '*', { maxAge: 1 });
+    response.headers = toRecord(res.headers);
+    response.setCookie = {
+        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
+        account: request.cookie.account || '',
+        token: request.cookie.token || '',
+    };
+    response.statusCode = res.status;
+    response.isBase64Encoded = false;
+    response.body = await res.text();
+    return false;
+};
+exports.handleGetMatchById = handleGetMatchById;
+const handleStatic = async (request, response) => {
+    const fullUrl = request.fullUrl;
     const parsedUrl = new url_1.URL('', fullUrl);
-    if (req.method !== 'get') {
+    if (request.method !== 'get') {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await toFetch(req, '*', { withCertification: false });
+        const res = await toFetch(request, '*', { withCertification: false });
         const data = await res.text();
         response.statusCode = res.status;
         response.headers = toRecord(res.headers);
@@ -412,7 +428,7 @@ const handleStatic = async (req, response) => {
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
         if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
-            const res = await toFetch(req, '*', { withCertification: false });
+            const res = await toFetch(request, '*', { withCertification: false });
             response.statusCode = res.status;
             response.headers = toRecord(res.headers);
             response.isBase64Encoded = matchedItem.isBase64Encoded;

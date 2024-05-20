@@ -33,6 +33,10 @@ export type ParsedRequest = {
   headers: {
     [key: string]: string;
   };
+  queryParameters: {
+    [key: string]: string;
+  };
+  fullUrl:string
   method: string;
 };
 

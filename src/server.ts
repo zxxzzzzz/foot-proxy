@@ -27,7 +27,7 @@ const client = new OSS({
   bucket: 'footballc',
   internal: true,
 });
-const DOMAIN = 'http://175.27.166.226';
+
 const OSS_FILE_NAME = 'sync-test.json';
 
 function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
@@ -105,7 +105,7 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
   });
 };
 const getOssResponse = async (request: ParsedRequest, account: string) => {
-  const fullUrl = DOMAIN + request.rawPath;
+  const fullUrl = request.fullUrl;
   const ossData = await getOssData();
   return ossData.responseList.find((res) => {
     return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
@@ -156,9 +156,9 @@ const toFetch = async (
   const isForce = op?.isForce ?? false;
   const maxAge = op?.maxAge ?? 10 * 1000;
   const withCertification = op?.withCertification ?? true;
-  const fullUrl = DOMAIN + request.rawPath;
+  const fullUrl = request.fullUrl;
   const ossData = await getOssData();
-  const isLogin = fullUrl.endsWith('/api/users/login');
+  const isLogin = fullUrl.includes('/api/users/login');
   // 登录请求的处理
   if (isLogin) {
     const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
@@ -282,8 +282,8 @@ const toFetch = async (
 };
 
 export const handleLogin = async (request: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + request.rawPath;
-  if (!fullUrl.endsWith('/api/users/login')) return true;
+  const fullUrl = request.fullUrl;
+  if (!fullUrl.includes('/api/users/login')) return true;
   const loginData = JSON.parse(request.body || '{}') as { account: string; password: string };
   const res = await toFetch(request, '*');
   response.statusCode = res.status;
@@ -299,8 +299,8 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
 };
 // http://175.27.166.226/api/users/logout
 export const handleLogout = async (request: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + request.rawPath;
-  if (!fullUrl.endsWith('/api/users/logout')) return true;
+  const fullUrl = request.fullUrl;
+  if (!fullUrl.includes('/api/users/logout')) return true;
   const syncData = await getOssData();
   const accountList = syncData?.accountList || [];
   const cookieData = request.cookie;
@@ -323,8 +323,8 @@ export const handleLogout = async (request: ParsedRequest, response: ParsedRespo
 };
 
 export const handleGetMe = async (request: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + request.rawPath;
-  if (!fullUrl.endsWith('/api/users/getme')) return true;
+  const fullUrl = request.fullUrl;
+  if (!fullUrl.includes('/api/users/getme')) return true;
   const res = await toFetch(request, '*');
   response.headers = toRecord(res.headers);
   response.setCookie = {
@@ -345,7 +345,7 @@ export const handleGetMe = async (request: ParsedRequest, response: ParsedRespon
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/getMyConfig
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/update/db61981b-34de-4c19-946f-1824afc9c5b0
 export const handleSetting = async (request: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + request.rawPath;
+  const fullUrl = request.fullUrl
   const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
   const isUpdateConfig = fullUrl.includes('/api/userConfig/update');
   if (!isGetConfig && !isUpdateConfig) return true;
@@ -416,15 +416,32 @@ export const handleDeletePut = async (request: ParsedRequest, response: ParsedRe
 
   return false;
 };
+// http://proxy.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/matchs/getMatchById?matchId=1025387&type=zq
+export const handleGetMatchById = async (request: ParsedRequest, response: ParsedResponse) => {
+  const fullUrl = request.fullUrl;
+  if (!fullUrl.includes('/api/matchs/getMatchById')) return true;
+  const res = await toFetch(request, '*', { maxAge: 1 });
+  response.headers = toRecord(res.headers);
+  response.setCookie = {
+    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
+    account: request.cookie.account || '',
+    token: request.cookie.token || '',
+  };
+  response.statusCode = res.status;
+  response.isBase64Encoded = false;
+  response.body = await res.text();
 
-export const handleStatic = async (req: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = DOMAIN + req.rawPath;
+  return false;
+};
+
+export const handleStatic = async (request: ParsedRequest, response: ParsedResponse) => {
+  const fullUrl = request.fullUrl;
   const parsedUrl = new URL('', fullUrl);
-  if (req.method !== 'get') {
+  if (request.method !== 'get') {
     return true;
   }
   if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-    const res = await toFetch(req, '*', { withCertification: false });
+    const res = await toFetch(request, '*', { withCertification: false });
     const data = await res.text();
     response.statusCode = res.status;
     response.headers = toRecord(res.headers);
@@ -444,7 +461,7 @@ export const handleStatic = async (req: ParsedRequest, response: ParsedResponse)
   const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
   if (matchedItem) {
     if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
-      const res = await toFetch(req, '*', { withCertification: false });
+      const res = await toFetch(request, '*', { withCertification: false });
       response.statusCode = res.status;
       response.headers = toRecord(res.headers);
       response.isBase64Encoded = matchedItem.isBase64Encoded;
