@@ -108,7 +108,7 @@ const updateOssGlobalCookie = async (res) => {
 const updateOssAccount = async (account, token) => {
     const ossData = await getOssData();
     const accountList = ossData.accountList || [];
-    updateOssData({
+    return updateOssData({
         accountList: accountList.map((item) => {
             if (item.account === account) {
                 return {
