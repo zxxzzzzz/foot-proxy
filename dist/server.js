@@ -209,27 +209,39 @@ const toFetch = async (request, matchAccount, op) => {
         });
     }
     if (isResponseExpired || isForce || !accountItem) {
-        const res = await fetch(fullUrl, {
-            headers: {
-                ...request.headers,
-                cookie: `session_id=${request.cookie.session_id}`,
-            },
-            body: ['get', 'head'].includes(request.method) ? null : (request.body || ''),
-            method: request.method,
-        });
-        const body = await res.text();
-        res.text = () => Promise.resolve(body);
-        await updateOssResponseList(res, matchAccount || '*', maxAge);
-        return new Response(body, {
-            status: res.status,
-            statusText: res.statusText,
-            headers: {
-                ...toRecord(res.headers),
-                'is-cache': 'false',
-                'is-response-expired': `${isResponseExpired}`,
-                'is-force': `${isForce}`,
-            },
-        });
+        try {
+            const res = await fetch(fullUrl, {
+                headers: {
+                    ...request.headers,
+                    cookie: `session_id=${request.cookie.session_id}`,
+                },
+                body: ['get', 'head'].includes(request.method) ? null : request.body || '',
+                method: request.method,
+            });
+            const body = await res.text();
+            res.text = () => Promise.resolve(body);
+            await updateOssResponseList(res, matchAccount || '*', maxAge);
+            return new Response(body, {
+                status: res.status,
+                statusText: res.statusText,
+                headers: {
+                    ...toRecord(res.headers),
+                    'is-cache': 'false',
+                    'is-response-expired': `${isResponseExpired}`,
+                    'is-force': `${isForce}`,
+                },
+            });
+        }
+        catch (error) {
+            const _err = error;
+            return new Response(`{"success":false,"error":"${_err.message + ' ' + _err.stack}"}`, {
+                status: 400,
+                statusText: 'fail',
+                headers: {
+                    'content-type': 'application/json',
+                },
+            });
+        }
     }
     return new Response(matchedCacheResponse.body, {
         status: 200,
