@@ -30,6 +30,7 @@ const pipe = async (
       return `${k}=${v}`;
     })
     .join('&');
+  const url = DOMAIN + request.rawPath
   const parsedRequest: ParsedRequest = {
     rawPath: request.rawPath,
     method: request.requestContext.http.method.toLowerCase(),
@@ -38,7 +39,7 @@ const pipe = async (
     cookie: cookie as { account: string; session_id: string; token: string },
     headers: request.headers,
     queryParameters: request.queryParameters,
-    fullUrl: queryStr ? DOMAIN + request.rawPath + '?' + encodeURIComponent(queryStr) : DOMAIN + request.rawPath,
+    fullUrl: queryStr ? url + '?' + encodeURIComponent(queryStr) : url,
   };
 
   try {

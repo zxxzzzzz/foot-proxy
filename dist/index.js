@@ -23,6 +23,7 @@ const pipe = async (event, context, callback, funcList) => {
         return `${k}=${v}`;
     })
         .join('&');
+    const url = DOMAIN + request.rawPath;
     const parsedRequest = {
         rawPath: request.rawPath,
         method: request.requestContext.http.method.toLowerCase(),
@@ -31,7 +32,7 @@ const pipe = async (event, context, callback, funcList) => {
         cookie: cookie,
         headers: request.headers,
         queryParameters: request.queryParameters,
-        fullUrl: queryStr ? DOMAIN + request.rawPath + '?' + encodeURIComponent(queryStr) : DOMAIN + request.rawPath,
+        fullUrl: queryStr ? url + '?' + encodeURIComponent(queryStr) : url,
     };
     try {
         for (const func of funcList) {

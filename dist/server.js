@@ -228,6 +228,7 @@ const toFetch = async (request, matchAccount, op) => {
                     'is-cache': 'false',
                     'is-response-expired': `${isResponseExpired}`,
                     'is-force': `${isForce}`,
+                    'full-url': fullUrl,
                 },
             });
         }

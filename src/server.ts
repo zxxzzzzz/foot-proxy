@@ -258,6 +258,7 @@ const toFetch = async (
           'is-cache': 'false',
           'is-response-expired': `${isResponseExpired}`,
           'is-force': `${isForce}`,
+          'full-url': fullUrl,
         },
       });
     } catch (error) {
