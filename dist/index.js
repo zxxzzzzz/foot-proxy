@@ -32,7 +32,7 @@ const pipe = async (event, context, callback, funcList) => {
         cookie: cookie,
         headers: request.headers,
         queryParameters: request.queryParameters,
-        fullUrl: queryStr ? url + '?' + encodeURIComponent(queryStr) : url,
+        fullUrl: queryStr ? url + '?' + encodeURI(queryStr) : url,
     };
     try {
         for (const func of funcList) {

@@ -39,7 +39,7 @@ const pipe = async (
     cookie: cookie as { account: string; session_id: string; token: string },
     headers: request.headers,
     queryParameters: request.queryParameters,
-    fullUrl: queryStr ? url + '?' + encodeURIComponent(queryStr) : url,
+    fullUrl: queryStr ? url + '?' + encodeURI(queryStr) : url,
   };
 
   try {
