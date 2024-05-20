@@ -222,6 +222,8 @@ const toFetch = async (request, account, op) => {
         res.text = () => Promise.resolve(body);
         await updateOssResponseList(res, account || '*', maxAge);
         return new Response(body, {
+            status: res.status,
+            statusText: res.statusText,
             headers: {
                 ...toRecord(res.headers),
                 'is-cache': 'false',
