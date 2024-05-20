@@ -188,7 +188,8 @@ const toFetch = async (request, account, op) => {
     }
     const matchedCacheResponse = await getOssResponse(request, account);
     const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
-    const isValidAccount = ossData.accountList.some((ac) => ac.account === account);
+    const accountItem = ossData.accountList.find((ac) => ac.account === account);
+    const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
     if (!withCertification) {
         const res = await fetch(fullUrl, {
             headers: {
@@ -199,7 +200,16 @@ const toFetch = async (request, account, op) => {
         });
         return res;
     }
-    if (isResponseExpired || isForce || !isValidAccount) {
+    if (accountItem && isTokenExpired) {
+        return new Response('{"success":false,"error":"请重新登录"}', {
+            status: 400,
+            statusText: 'error',
+            headers: {
+                'content-type': 'application/json',
+            },
+        });
+    }
+    if (isResponseExpired || isForce || !accountItem) {
         const res = await fetch(fullUrl, {
             headers: {
                 ...request.headers,
