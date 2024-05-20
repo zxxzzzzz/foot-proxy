@@ -162,7 +162,6 @@ const toFetch = async (request, matchAccount, op) => {
                 },
             });
         }
-        const token = `${new Date().valueOf()}`;
         const matchedCacheResponse = await getOssResponse(request, matchAccount);
         if (!matchedCacheResponse) {
             return new Response('{"success":false,"error":"主账号未登录"}', {
@@ -170,10 +169,10 @@ const toFetch = async (request, matchAccount, op) => {
                 statusText: 'error',
                 headers: {
                     'content-type': 'application/json',
-                    'account-token': token,
                 },
             });
         }
+        const token = `${new Date().valueOf()}`;
         await updateOssAccount(accountItem.account, token);
         return new Response(matchedCacheResponse.body, {
             status: 200,
@@ -283,6 +282,25 @@ const handleLogout = async (request, response) => {
     return false;
 };
 exports.handleLogout = handleLogout;
+const handleGetMe = async (request, response) => {
+    const fullUrl = DOMAIN + request.rawPath;
+    if (!fullUrl.endsWith('/api/users/getme'))
+        return true;
+    const res = await toFetch(request, '*');
+    response.headers = toRecord(res.headers);
+    response.setCookie = {
+        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
+        account: request.cookie.account || '',
+        token: request.cookie.token || '',
+    };
+    response.statusCode = res.status;
+    response.isBase64Encoded = false;
+    response.body = await res.text();
+    if (response.statusCode === 405) {
+        response.body = '{"success":false,"error":"请重新登录主号"}';
+    }
+    return false;
+};
 const handleSetting = async (request, response) => {
     const fullUrl = DOMAIN + request.rawPath;
     const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
