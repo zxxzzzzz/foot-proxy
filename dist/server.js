@@ -14,7 +14,7 @@ const client = new ali_oss_1.default({
     bucket: 'footballc',
     internal: true,
 });
-const OSS_FILE_NAME = 'proxy-sync.json';
+const OSS_FILE_NAME = 'sync-test.json';
 function uniqBy(itemList, cb) {
     const idList = [];
     const reItemList = [];

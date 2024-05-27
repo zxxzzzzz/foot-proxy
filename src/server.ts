@@ -29,7 +29,7 @@ const client = new OSS({
   internal: true,
 });
 
-const OSS_FILE_NAME = 'proxy-sync.json';
+const OSS_FILE_NAME = 'sync-test.json';
 
 function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
   const idList: string[] = [];
