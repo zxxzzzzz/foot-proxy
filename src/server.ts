@@ -111,7 +111,7 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     (item) => item.matchedAccount + item.url
   );
   const responseList = Object.values(groupedObj)
-    .map((v) => v.slice(0, 10))
+    .map((v) => uniqBy(v.slice(0, 10), item => item.payload))
     .flat();
   return updateOssData({
     responseList,
