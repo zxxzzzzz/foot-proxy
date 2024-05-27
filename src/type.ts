@@ -29,14 +29,18 @@ export type ParsedRequest = {
   rawPath: string;
   body: string;
   isBase64Encoded: boolean;
-  cookie: { account: string, session_id:string, token:string };
+  cookie: { account: string; session_id: string; token: string };
   headers: {
     [key: string]: string;
   };
   queryParameters: {
     [key: string]: string;
   };
-  fullUrl:string
+  query: string;
+  /**不带带query的url */
+  url: string;
+  /**带query的url */
+  fullUrl: string;
   method: string;
 };
 

@@ -32,6 +32,8 @@ const pipe = async (event, context, callback, funcList) => {
         cookie: cookie,
         headers: request.headers,
         queryParameters: request.queryParameters,
+        url,
+        query: queryStr,
         fullUrl: queryStr ? url + '?' + encodeURI(queryStr) : url,
     };
     try {

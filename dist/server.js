@@ -72,10 +72,11 @@ const updateOssResponseList = async (res, account, maxAge, payload) => {
     });
     const body = await res.text();
     res.text = () => Promise.resolve(body);
+    const parsedUrl = new url_1.URL('', res.url);
     const response = {
         body,
         headers,
-        url: res.url ?? res._url,
+        url: parsedUrl.origin + parsedUrl.pathname,
         matchedAccount: account || '*',
         timestamp: new Date().valueOf(),
         maxAge,
@@ -229,7 +230,7 @@ const toFetch = async (request, matchAccount, op) => {
                     'is-cache': 'false',
                     'is-response-expired': `${isResponseExpired}`,
                     'is-force': `${isForce}`,
-                    'is-payload-match': `${!!op?.needMatchPayload}`,
+                    payload: request.body,
                     'full-url': fullUrl,
                 },
             });
@@ -251,7 +252,7 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
-            'is-payload-match': `${!!op?.needMatchPayload}`,
+            payload: matchedCacheResponse.payload,
         },
     });
 };

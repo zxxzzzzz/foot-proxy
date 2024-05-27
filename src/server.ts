@@ -88,11 +88,11 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
   });
   const body = await res.text();
   res.text = () => Promise.resolve(body);
+  const parsedUrl = new URL('', res.url);
   const response: OSSData['responseList'][0] = {
     body,
     headers,
-    // @ts-expect-error hack写法
-    url: res.url ?? res._url,
+    url: parsedUrl.origin + parsedUrl.pathname,
     matchedAccount: account || '*',
     timestamp: new Date().valueOf(),
     maxAge,
@@ -261,7 +261,7 @@ const toFetch = async (
           'is-cache': 'false',
           'is-response-expired': `${isResponseExpired}`,
           'is-force': `${isForce}`,
-          'is-payload-match': `${!!op?.needMatchPayload}`,
+          payload: request.body,
           'full-url': fullUrl,
         },
       });
@@ -282,7 +282,7 @@ const toFetch = async (
     headers: {
       ...matchedCacheResponse.headers,
       'is-cache': 'true',
-      'is-payload-match': `${!!op?.needMatchPayload}`,
+      payload: matchedCacheResponse.payload,
     },
   });
 };
