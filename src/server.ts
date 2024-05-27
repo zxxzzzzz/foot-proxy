@@ -292,6 +292,7 @@ const toFetch = async (
     headers: {
       ...matchedCacheResponse.headers,
       'is-cache': 'true',
+      'cache-payload': encodeURIComponent(matchedCacheResponse.payload)
     },
   });
 };

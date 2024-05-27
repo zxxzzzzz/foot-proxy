@@ -261,6 +261,7 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
+            'cache-payload': encodeURIComponent(matchedCacheResponse.payload)
         },
     });
 };
