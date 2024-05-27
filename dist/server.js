@@ -89,9 +89,11 @@ const updateOssResponseList = async (res, account, maxAge, payload) => {
 };
 const getOssResponse = async (request, account, payload) => {
     const fullUrl = request.fullUrl;
+    const parsedUrl = new url_1.URL('', fullUrl);
+    const url = parsedUrl.origin + parsedUrl.pathname;
     const ossData = await getOssData();
     return ossData.responseList.find((res) => {
-        return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
+        return res.url === url && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
     });
 };
 const updateOssGlobalCookie = async (res) => {

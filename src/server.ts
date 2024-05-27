@@ -108,9 +108,11 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
 };
 const getOssResponse = async (request: ParsedRequest, account: string, payload: string) => {
   const fullUrl = request.fullUrl;
+  const parsedUrl = new URL('', fullUrl);
+  const url = parsedUrl.origin + parsedUrl.pathname
   const ossData = await getOssData();
   return ossData.responseList.find((res) => {
-    return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
+    return res.url === url && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
   });
 };
 
