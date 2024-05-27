@@ -230,7 +230,6 @@ const toFetch = async (request, matchAccount, op) => {
                     'is-cache': 'false',
                     'is-response-expired': `${isResponseExpired}`,
                     'is-force': `${isForce}`,
-                    payload: request.body,
                     'full-url': fullUrl,
                 },
             });
@@ -252,7 +251,6 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
-            payload: matchedCacheResponse.payload,
         },
     });
 };
