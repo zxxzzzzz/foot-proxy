@@ -261,7 +261,7 @@ const toFetch = async (
           'is-cache': 'false',
           'is-response-expired': `${isResponseExpired}`,
           'is-force': `${isForce}`,
-          'is-payload-match': `${!!op.needMatchPayload}`,
+          'is-payload-match': `${!!op?.needMatchPayload}`,
           'full-url': fullUrl,
         },
       });
@@ -282,7 +282,7 @@ const toFetch = async (
     headers: {
       ...matchedCacheResponse.headers,
       'is-cache': 'true',
-      'is-payload-match': `${!!op.needMatchPayload}`,
+      'is-payload-match': `${!!op?.needMatchPayload}`,
     },
   });
 };
