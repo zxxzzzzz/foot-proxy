@@ -29,7 +29,7 @@ const client = new OSS({
   internal: true,
 });
 
-const OSS_FILE_NAME = 'sync-test.json';
+const OSS_FILE_NAME = 'proxy-sync.json';
 
 function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
   const idList: string[] = [];
@@ -42,6 +42,14 @@ function uniqBy<T>(itemList: T[], cb: (item: T) => string) {
     }
   }
   return reItemList;
+}
+
+function groupBy<T>(itemList: T[], cb: (item: T) => string) {
+  return itemList.reduce<{ [k: string]: T[] }>((re, cur) => {
+    const key = cb(cur);
+    re[key] = [].concat(re[key] || [], cur);
+    return re;
+  }, {});
 }
 
 const getOssData = async (): Promise<OSSData> => {
@@ -98,18 +106,19 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     maxAge,
     payload,
   };
-  const responseList = uniqBy(
+  const groupedObj = groupBy(
     [...ossData.responseList, response].reverse().filter((item) => item.url),
-    (item) => item.matchedAccount + ' ' + item.url + item.payload
+    (item) => item.matchedAccount + item.url
   );
+  const responseList = Object.values(groupedObj)
+    .map((v) => v.slice(0, 10))
+    .flat();
   return updateOssData({
     responseList,
   });
 };
 const getOssResponse = async (request: ParsedRequest, account: string, payload: string) => {
-  const fullUrl = request.fullUrl;
-  const parsedUrl = new URL('', fullUrl);
-  const url = parsedUrl.origin + parsedUrl.pathname
+  const url = request.url;
   const ossData = await getOssData();
   return ossData.responseList.find((res) => {
     return res.url === url && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);

@@ -14,7 +14,7 @@ const client = new ali_oss_1.default({
     bucket: 'footballc',
     internal: true,
 });
-const OSS_FILE_NAME = 'sync-test.json';
+const OSS_FILE_NAME = 'proxy-sync.json';
 function uniqBy(itemList, cb) {
     const idList = [];
     const reItemList = [];
@@ -26,6 +26,13 @@ function uniqBy(itemList, cb) {
         }
     }
     return reItemList;
+}
+function groupBy(itemList, cb) {
+    return itemList.reduce((re, cur) => {
+        const key = cb(cur);
+        re[key] = [].concat(re[key] || [], cur);
+        return re;
+    }, {});
 }
 const getOssData = async () => {
     let ossRes = void 0;
@@ -82,15 +89,16 @@ const updateOssResponseList = async (res, account, maxAge, payload) => {
         maxAge,
         payload,
     };
-    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + ' ' + item.url + item.payload);
+    const groupedObj = groupBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + item.url);
+    const responseList = Object.values(groupedObj)
+        .map((v) => v.slice(0, 10))
+        .flat();
     return updateOssData({
         responseList,
     });
 };
 const getOssResponse = async (request, account, payload) => {
-    const fullUrl = request.fullUrl;
-    const parsedUrl = new url_1.URL('', fullUrl);
-    const url = parsedUrl.origin + parsedUrl.pathname;
+    const url = request.url;
     const ossData = await getOssData();
     return ossData.responseList.find((res) => {
         return res.url === url && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
