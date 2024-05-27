@@ -10,6 +10,7 @@ type OSSData = {
   };
   responseList: {
     body: string;
+    payload: string;
     url: string;
     headers: { [k: string]: string };
     timestamp: number;
@@ -78,7 +79,7 @@ const updateOssData = async (data: Partial<OSSData>) => {
     console.log('put error', error);
   }
 };
-const updateOssResponseList = async (res: Response, account: string, maxAge: number) => {
+const updateOssResponseList = async (res: Response, account: string, maxAge: number, payload: string) => {
   if (res.status !== 200) return;
   const ossData = await getOssData();
   const headers: { [k: string]: string } = {};
@@ -95,20 +96,21 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     matchedAccount: account || '*',
     timestamp: new Date().valueOf(),
     maxAge,
+    payload,
   };
   const responseList = uniqBy(
     [...ossData.responseList, response].reverse().filter((item) => item.url),
-    (item) => item.matchedAccount + ' ' + item.url
+    (item) => item.matchedAccount + ' ' + item.url + item.payload
   );
   return updateOssData({
     responseList,
   });
 };
-const getOssResponse = async (request: ParsedRequest, account: string) => {
+const getOssResponse = async (request: ParsedRequest, account: string, payload: string) => {
   const fullUrl = request.fullUrl;
   const ossData = await getOssData();
   return ossData.responseList.find((res) => {
-    return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
+    return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
   });
 };
 
@@ -151,7 +153,7 @@ const toRecord = (headers: Headers) => {
 const toFetch = async (
   request: ParsedRequest,
   matchAccount: string,
-  op?: { isForce?: boolean; withCertification?: boolean; maxAge?: number }
+  op?: { isForce?: boolean; withCertification?: boolean; maxAge?: number; needMatchPayload?: boolean }
 ) => {
   const isForce = op?.isForce ?? false;
   const maxAge = op?.maxAge ?? 10 * 1000;
@@ -175,7 +177,7 @@ const toFetch = async (
       res.text = () => {
         return Promise.resolve(body);
       };
-      await updateOssResponseList(res, '*', maxAge);
+      await updateOssResponseList(res, '*', maxAge, '');
       await updateOssGlobalCookie(res);
       return res;
     }
@@ -189,7 +191,7 @@ const toFetch = async (
         },
       });
     }
-    const matchedCacheResponse = await getOssResponse(request, matchAccount);
+    const matchedCacheResponse = await getOssResponse(request, matchAccount, '');
     if (!matchedCacheResponse) {
       return new Response('{"success":false,"error":"主账号未登录"}', {
         status: 400,
@@ -212,11 +214,6 @@ const toFetch = async (
       },
     });
   }
-  // 其他请求处理
-  const matchedCacheResponse = await getOssResponse(request, matchAccount);
-  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
-  const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
-  const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
   // 不用认证的请求，直接透传
   if (!withCertification) {
     const res = await fetch(fullUrl, {
@@ -228,6 +225,12 @@ const toFetch = async (
     });
     return res;
   }
+  // 其他请求处理
+  const matchedCacheResponse = await getOssResponse(request, matchAccount, op?.needMatchPayload ? request.body : '');
+  // 不存在matchedCacheResponse也是一种过期
+  const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
+  const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
+  const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
   if (accountItem && isTokenExpired) {
     return new Response('{"success":false,"error":"请重新登录"}', {
       status: 400,
@@ -249,7 +252,7 @@ const toFetch = async (
       });
       const body = await res.text();
       res.text = () => Promise.resolve(body);
-      await updateOssResponseList(res, matchAccount || '*', maxAge);
+      await updateOssResponseList(res, matchAccount || '*', maxAge, request.body);
       return new Response(body, {
         status: res.status,
         statusText: res.statusText,
@@ -258,6 +261,7 @@ const toFetch = async (
           'is-cache': 'false',
           'is-response-expired': `${isResponseExpired}`,
           'is-force': `${isForce}`,
+          'is-payload-match': `${!!op.needMatchPayload}`,
           'full-url': fullUrl,
         },
       });
@@ -278,6 +282,7 @@ const toFetch = async (
     headers: {
       ...matchedCacheResponse.headers,
       'is-cache': 'true',
+      'is-payload-match': `${!!op.needMatchPayload}`,
     },
   });
 };
@@ -346,7 +351,7 @@ export const handleGetMe = async (request: ParsedRequest, response: ParsedRespon
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/getMyConfig
 // http://proxy-test.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/userConfig/update/db61981b-34de-4c19-946f-1824afc9c5b0
 export const handleSetting = async (request: ParsedRequest, response: ParsedResponse) => {
-  const fullUrl = request.fullUrl
+  const fullUrl = request.fullUrl;
   const isGetConfig = fullUrl.includes('/api/userConfig/getMyConfig');
   const isUpdateConfig = fullUrl.includes('/api/userConfig/update');
   if (!isGetConfig && !isUpdateConfig) return true;
@@ -362,15 +367,14 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
     response.isBase64Encoded = false;
     response.body = await res.text();
     // 更新getMyConfig缓存请求
-    const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account);
+    const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account, '');
     if (!matchedCacheResponse) return;
     const body = JSON.stringify({ ...JSON.parse(matchedCacheResponse.body), ...JSON.parse(request.body) });
     const res2 = new Response(body, {
       headers: matchedCacheResponse.headers,
     });
-    // @ts-expect-error hack写法
-    res2._url = DOMAIN + '/api/userConfig/getMyConfig';
-    await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
+    const tempRes = Object.assign({}, res2, { url: fullUrl });
+    await updateOssResponseList(tempRes, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100, '');
     return false;
   }
   // 获取配置
@@ -389,7 +393,7 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
 
 // 其他请求全部透传
 export const handleOtherApi = async (request: ParsedRequest, response: ParsedResponse) => {
-  const res = await toFetch(request, '*');
+  const res = await toFetch(request, '*', { needMatchPayload: true });
   response.headers = toRecord(res.headers);
   response.setCookie = {
     ...Cookie.parseSetCookie(res.headers.getSetCookie()),

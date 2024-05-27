@@ -30,12 +30,12 @@ const pipe = async (
       return `${k}=${v}`;
     })
     .join('&');
-  const url = DOMAIN + request.rawPath
+  const url = DOMAIN + request.rawPath;
   const parsedRequest: ParsedRequest = {
     rawPath: request.rawPath,
     method: request.requestContext.http.method.toLowerCase(),
     isBase64Encoded: request.isBase64Encoded,
-    body: request.body,
+    body: request.body || '',
     cookie: cookie as { account: string; session_id: string; token: string },
     headers: request.headers,
     queryParameters: request.queryParameters,

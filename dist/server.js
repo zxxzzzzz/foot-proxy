@@ -62,7 +62,7 @@ const updateOssData = async (data) => {
         console.log('put error', error);
     }
 };
-const updateOssResponseList = async (res, account, maxAge) => {
+const updateOssResponseList = async (res, account, maxAge, payload) => {
     if (res.status !== 200)
         return;
     const ossData = await getOssData();
@@ -79,17 +79,18 @@ const updateOssResponseList = async (res, account, maxAge) => {
         matchedAccount: account || '*',
         timestamp: new Date().valueOf(),
         maxAge,
+        payload,
     };
-    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + ' ' + item.url);
+    const responseList = uniqBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + ' ' + item.url + item.payload);
     return updateOssData({
         responseList,
     });
 };
-const getOssResponse = async (request, account) => {
+const getOssResponse = async (request, account, payload) => {
     const fullUrl = request.fullUrl;
     const ossData = await getOssData();
     return ossData.responseList.find((res) => {
-        return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account);
+        return res.url === fullUrl && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
     });
 };
 const updateOssGlobalCookie = async (res) => {
@@ -148,7 +149,7 @@ const toFetch = async (request, matchAccount, op) => {
             res.text = () => {
                 return Promise.resolve(body);
             };
-            await updateOssResponseList(res, '*', maxAge);
+            await updateOssResponseList(res, '*', maxAge, '');
             await updateOssGlobalCookie(res);
             return res;
         }
@@ -161,7 +162,7 @@ const toFetch = async (request, matchAccount, op) => {
                 },
             });
         }
-        const matchedCacheResponse = await getOssResponse(request, matchAccount);
+        const matchedCacheResponse = await getOssResponse(request, matchAccount, '');
         if (!matchedCacheResponse) {
             return new Response('{"success":false,"error":"主账号未登录"}', {
                 status: 400,
@@ -184,10 +185,6 @@ const toFetch = async (request, matchAccount, op) => {
             },
         });
     }
-    const matchedCacheResponse = await getOssResponse(request, matchAccount);
-    const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
-    const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
-    const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
     if (!withCertification) {
         const res = await fetch(fullUrl, {
             headers: {
@@ -198,6 +195,10 @@ const toFetch = async (request, matchAccount, op) => {
         });
         return res;
     }
+    const matchedCacheResponse = await getOssResponse(request, matchAccount, op?.needMatchPayload ? request.body : '');
+    const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
+    const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
+    const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
     if (accountItem && isTokenExpired) {
         return new Response('{"success":false,"error":"请重新登录"}', {
             status: 400,
@@ -219,7 +220,7 @@ const toFetch = async (request, matchAccount, op) => {
             });
             const body = await res.text();
             res.text = () => Promise.resolve(body);
-            await updateOssResponseList(res, matchAccount || '*', maxAge);
+            await updateOssResponseList(res, matchAccount || '*', maxAge, request.body);
             return new Response(body, {
                 status: res.status,
                 statusText: res.statusText,
@@ -228,6 +229,7 @@ const toFetch = async (request, matchAccount, op) => {
                     'is-cache': 'false',
                     'is-response-expired': `${isResponseExpired}`,
                     'is-force': `${isForce}`,
+                    'is-payload-match': `${!!op.needMatchPayload}`,
                     'full-url': fullUrl,
                 },
             });
@@ -249,6 +251,7 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
+            'is-payload-match': `${!!op.needMatchPayload}`,
         },
     });
 };
@@ -331,15 +334,15 @@ const handleSetting = async (request, response) => {
         response.statusCode = res.status;
         response.isBase64Encoded = false;
         response.body = await res.text();
-        const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account);
+        const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account, '');
         if (!matchedCacheResponse)
             return;
         const body = JSON.stringify({ ...JSON.parse(matchedCacheResponse.body), ...JSON.parse(request.body) });
         const res2 = new Response(body, {
             headers: matchedCacheResponse.headers,
         });
-        res2._url = DOMAIN + '/api/userConfig/getMyConfig';
-        await updateOssResponseList(res2, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100);
+        const tempRes = Object.assign({}, res2, { url: fullUrl });
+        await updateOssResponseList(tempRes, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100, '');
         return false;
     }
     const res = await toFetch(request, request.cookie.account ?? '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
@@ -356,7 +359,7 @@ const handleSetting = async (request, response) => {
 };
 exports.handleSetting = handleSetting;
 const handleOtherApi = async (request, response) => {
-    const res = await toFetch(request, '*');
+    const res = await toFetch(request, '*', { needMatchPayload: true });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),

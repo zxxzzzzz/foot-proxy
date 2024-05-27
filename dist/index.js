@@ -28,7 +28,7 @@ const pipe = async (event, context, callback, funcList) => {
         rawPath: request.rawPath,
         method: request.requestContext.http.method.toLowerCase(),
         isBase64Encoded: request.isBase64Encoded,
-        body: request.body,
+        body: request.body || '',
         cookie: cookie,
         headers: request.headers,
         queryParameters: request.queryParameters,
