@@ -15,6 +15,7 @@ const client = new ali_oss_1.default({
     internal: true,
 });
 const OSS_FILE_NAME = 'sync-test.json';
+const ONE_YEAR = 1000 * 60 * 60 * 24 * 365;
 function uniqBy(itemList, cb) {
     const idList = [];
     const reItemList = [];
@@ -69,40 +70,45 @@ const updateOssData = async (data) => {
         console.log('put error', error);
     }
 };
-const updateOssResponseList = async (res, account, maxAge, payload) => {
-    if (res.status !== 200)
+const updateOssResponseList = async (response, request, op) => {
+    if (response.status !== 200)
         return;
     const ossData = await getOssData();
     const headers = {};
-    res.headers.forEach((v, k) => {
+    response.headers.forEach((v, k) => {
         headers[k] = v;
     });
-    const body = await res.text();
-    res.text = () => Promise.resolve(body);
-    const parsedUrl = new url_1.URL('', res.url);
-    const response = {
+    const body = await response.text();
+    response.text = () => Promise.resolve(body);
+    const parsedUrl = new url_1.URL('', response.url);
+    const toAddResponse = {
         body,
         headers,
         url: parsedUrl.origin + parsedUrl.pathname,
-        matchedAccount: account || '*',
+        matchedAccount: op.account || '*',
         timestamp: new Date().valueOf(),
-        maxAge,
-        payload,
+        maxAge: op.maxAge,
+        payload: request.body,
     };
-    const groupedObj = groupBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + item.url);
+    const groupedObj = groupBy([...ossData.responseList, toAddResponse].reverse().filter((item) => item.url), (item) => item.matchedAccount + item.url);
     const responseList = Object.values(groupedObj)
-        .map((v) => uniqBy(v.slice(0, 10), (item) => item.payload))
+        .map((v) => uniqBy(v.slice(0, op.maxCount), (item) => item.payload))
         .flat();
     return updateOssData({
         responseList,
     });
 };
-const getOssResponse = async (request, account, payload) => {
+const getOssResponse = async (request, op) => {
     const url = request.url;
+    const account = op.account;
+    const needMatchPayload = op.needMatchPayload;
     const ossData = await getOssData();
-    return ossData.responseList.find((res) => {
-        return res.url === url && (res.matchedAccount === '*' || res.matchedAccount === account) && (!payload || payload === res.payload);
+    const matchedList = ossData.responseList.filter((res) => {
+        return (res.url === url &&
+            (res.matchedAccount === '*' || res.matchedAccount === account) &&
+            (!needMatchPayload || request.body === res.payload));
     });
+    return matchedList.find((item) => item.matchedAccount === account) || matchedList.find((item) => item.matchedAccount === '*');
 };
 const updateOssGlobalCookie = async (res) => {
     if (res.status !== 200)
@@ -139,9 +145,11 @@ const toRecord = (headers) => {
     return _headers;
 };
 const toFetch = async (request, matchAccount, op) => {
-    const isForce = op?.isForce ?? false;
-    const maxAge = op?.maxAge ?? 10 * 1000;
-    const withCertification = op?.withCertification ?? true;
+    const isForce = op.isForce;
+    const maxAge = op.maxAge;
+    const withCertification = op.withCertification;
+    const maxCount = op.maxCount;
+    const needMatchPayload = op.needMatchPayload;
     const fullUrl = request.fullUrl;
     const ossData = await getOssData();
     const isLogin = fullUrl.includes('/api/users/login');
@@ -160,7 +168,7 @@ const toFetch = async (request, matchAccount, op) => {
             res.text = () => {
                 return Promise.resolve(body);
             };
-            await updateOssResponseList(res, '*', maxAge, '');
+            await updateOssResponseList(res, request, { account: '*', maxAge, maxCount: 1 });
             await updateOssGlobalCookie(res);
             return res;
         }
@@ -173,7 +181,7 @@ const toFetch = async (request, matchAccount, op) => {
                 },
             });
         }
-        const matchedCacheResponse = await getOssResponse(request, matchAccount, '');
+        const matchedCacheResponse = await getOssResponse(request, { account: matchAccount, needMatchPayload: false });
         if (!matchedCacheResponse) {
             return new Response('{"success":false,"error":"主账号未登录"}', {
                 status: 400,
@@ -206,7 +214,7 @@ const toFetch = async (request, matchAccount, op) => {
         });
         return res;
     }
-    const matchedCacheResponse = await getOssResponse(request, matchAccount, op?.needMatchPayload ? request.body : '');
+    const matchedCacheResponse = await getOssResponse(request, { account: matchAccount, needMatchPayload });
     const isResponseExpired = new Date().valueOf() - (matchedCacheResponse?.timestamp || 0) > (matchedCacheResponse?.maxAge || 0);
     const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
     const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
@@ -231,7 +239,7 @@ const toFetch = async (request, matchAccount, op) => {
             });
             const body = await res.text();
             res.text = () => Promise.resolve(body);
-            await updateOssResponseList(res, matchAccount || '*', maxAge, request.body);
+            await updateOssResponseList(res, request, { account: matchAccount || '*', maxAge, maxCount });
             return new Response(body, {
                 status: res.status,
                 statusText: res.statusText,
@@ -270,7 +278,13 @@ const handleLogin = async (request, response) => {
     if (!fullUrl.includes('/api/users/login'))
         return true;
     const loginData = JSON.parse(request.body || '{}');
-    const res = await toFetch(request, '*');
+    const res = await toFetch(request, '*', {
+        maxAge: 10 * 1000,
+        isForce: false,
+        needMatchPayload: false,
+        maxCount: 1,
+        withCertification: true,
+    });
     response.statusCode = res.status;
     response.headers = toRecord(res.headers);
     response.body = await res.text();
@@ -292,7 +306,13 @@ const handleLogout = async (request, response) => {
     const cookieData = request.cookie;
     const account = cookieData?.account;
     const isValidAccount = accountList.some((item) => item.account === account);
-    const res = await toFetch(request, '*', { isForce: isValidAccount ? false : true });
+    const res = await toFetch(request, '*', {
+        isForce: isValidAccount ? false : true,
+        maxCount: 1,
+        maxAge: ONE_YEAR * 100,
+        withCertification: true,
+        needMatchPayload: false,
+    });
     const text = await res.text();
     response.statusCode = res.status;
     response.headers = toRecord(res.headers);
@@ -311,7 +331,13 @@ const handleGetMe = async (request, response) => {
     const fullUrl = request.fullUrl;
     if (!fullUrl.includes('/api/users/getme'))
         return true;
-    const res = await toFetch(request, '*');
+    const res = await toFetch(request, '*', {
+        needMatchPayload: false,
+        maxAge: 10 * 1000,
+        withCertification: true,
+        isForce: false,
+        maxCount: 1,
+    });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -334,7 +360,13 @@ const handleSetting = async (request, response) => {
     if (!isGetConfig && !isUpdateConfig)
         return true;
     if (isUpdateConfig) {
-        const res = await toFetch(request, '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
+        const res = await toFetch(request, '*', {
+            maxAge: ONE_YEAR * 100,
+            maxCount: 20,
+            withCertification: true,
+            needMatchPayload: false,
+            isForce: false,
+        });
         response.headers = toRecord(res.headers);
         response.setCookie = {
             ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -344,7 +376,7 @@ const handleSetting = async (request, response) => {
         response.statusCode = res.status;
         response.isBase64Encoded = false;
         response.body = await res.text();
-        const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, request.cookie.account, '');
+        const matchedCacheResponse = await getOssResponse({ ...request, rawPath: '/api/userConfig/getMyConfig' }, { account: request.cookie.account, needMatchPayload: false });
         if (!matchedCacheResponse)
             return;
         const body = JSON.stringify({ ...JSON.parse(matchedCacheResponse.body), ...JSON.parse(request.body) });
@@ -352,10 +384,20 @@ const handleSetting = async (request, response) => {
             headers: matchedCacheResponse.headers,
         });
         const tempRes = Object.assign({}, res2, { url: fullUrl });
-        await updateOssResponseList(tempRes, request.cookie.account, 1000 * 60 * 60 * 24 * 365 * 100, '');
+        await updateOssResponseList(tempRes, request, {
+            account: request.cookie.account,
+            maxAge: ONE_YEAR * 100,
+            maxCount: 20,
+        });
         return false;
     }
-    const res = await toFetch(request, request.cookie.account ?? '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
+    const res = await toFetch(request, request.cookie.account ?? '*', {
+        maxAge: ONE_YEAR * 100,
+        maxCount: 20,
+        withCertification: true,
+        needMatchPayload: false,
+        isForce: false,
+    });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -369,7 +411,13 @@ const handleSetting = async (request, response) => {
 };
 exports.handleSetting = handleSetting;
 const handleOtherApi = async (request, response) => {
-    const res = await toFetch(request, '*', { needMatchPayload: true });
+    const res = await toFetch(request, '*', {
+        needMatchPayload: true,
+        maxAge: 10 * 1000,
+        withCertification: true,
+        isForce: false,
+        maxCount: 10,
+    });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -385,7 +433,7 @@ exports.handleOtherApi = handleOtherApi;
 const handleDeletePut = async (request, response) => {
     if (!['put', 'delete'].includes(request.method.toLowerCase()))
         return true;
-    const res = await toFetch(request, '*', { maxAge: 1 });
+    const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: true, withCertification: true, isForce: false, maxCount: 10 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -402,7 +450,7 @@ const handleGetMatchById = async (request, response) => {
     const fullUrl = request.fullUrl;
     if (!fullUrl.includes('/api/matchs/getMatchById'))
         return true;
-    const res = await toFetch(request, '*', { maxAge: 1 });
+    const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: false, withCertification: true, isForce: true, maxCount: 1 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
         ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
@@ -422,7 +470,13 @@ const handleStatic = async (request, response) => {
         return true;
     }
     if (parsedUrl.pathname === '/' || parsedUrl.pathname === '') {
-        const res = await toFetch(request, '*', { withCertification: false });
+        const res = await toFetch(request, '*', {
+            withCertification: false,
+            needMatchPayload: true,
+            maxAge: 10 * 1000,
+            isForce: false,
+            maxCount: 10,
+        });
         const data = await res.text();
         response.statusCode = res.status;
         response.headers = toRecord(res.headers);
@@ -442,7 +496,13 @@ const handleStatic = async (request, response) => {
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
         if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
-            const res = await toFetch(request, '*', { withCertification: false });
+            const res = await toFetch(request, '*', {
+                withCertification: false,
+                needMatchPayload: true,
+                maxAge: 10 * 1000,
+                isForce: false,
+                maxCount: 10,
+            });
             response.statusCode = res.status;
             response.headers = toRecord(res.headers);
             response.isBase64Encoded = matchedItem.isBase64Encoded;
