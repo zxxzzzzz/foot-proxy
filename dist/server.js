@@ -91,7 +91,7 @@ const updateOssResponseList = async (res, account, maxAge, payload) => {
     };
     const groupedObj = groupBy([...ossData.responseList, response].reverse().filter((item) => item.url), (item) => item.matchedAccount + item.url);
     const responseList = Object.values(groupedObj)
-        .map((v) => uniqBy(v.slice(0, 10), item => item.payload))
+        .map((v) => uniqBy(v.slice(0, 10), (item) => item.payload))
         .flat();
     return updateOssData({
         responseList,
@@ -261,7 +261,7 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
-            'cache-payload': encodeURIComponent(matchedCacheResponse.payload)
+            'cache-payload': encodeURIComponent(matchedCacheResponse.payload),
         },
     });
 };
@@ -334,7 +334,7 @@ const handleSetting = async (request, response) => {
     if (!isGetConfig && !isUpdateConfig)
         return true;
     if (isUpdateConfig) {
-        const res = await toFetch(request, '*');
+        const res = await toFetch(request, '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
         response.headers = toRecord(res.headers);
         response.setCookie = {
             ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),

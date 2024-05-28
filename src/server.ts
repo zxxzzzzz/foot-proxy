@@ -111,7 +111,7 @@ const updateOssResponseList = async (res: Response, account: string, maxAge: num
     (item) => item.matchedAccount + item.url
   );
   const responseList = Object.values(groupedObj)
-    .map((v) => uniqBy(v.slice(0, 10), item => item.payload))
+    .map((v) => uniqBy(v.slice(0, 10), (item) => item.payload))
     .flat();
   return updateOssData({
     responseList,
@@ -292,7 +292,7 @@ const toFetch = async (
     headers: {
       ...matchedCacheResponse.headers,
       'is-cache': 'true',
-      'cache-payload': encodeURIComponent(matchedCacheResponse.payload)
+      'cache-payload': encodeURIComponent(matchedCacheResponse.payload),
     },
   });
 };
@@ -366,7 +366,7 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
   const isUpdateConfig = fullUrl.includes('/api/userConfig/update');
   if (!isGetConfig && !isUpdateConfig) return true;
   if (isUpdateConfig) {
-    const res = await toFetch(request, '*');
+    const res = await toFetch(request, '*', { maxAge: 1000 * 60 * 60 * 24 * 365 * 100 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
       ...Cookie.parseSetCookie(res.headers.getSetCookie()),
