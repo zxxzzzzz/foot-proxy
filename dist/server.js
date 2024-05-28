@@ -269,7 +269,7 @@ const toFetch = async (request, matchAccount, op) => {
         headers: {
             ...matchedCacheResponse.headers,
             'is-cache': 'true',
-            'cache-payload': encodeURIComponent(matchedCacheResponse.payload),
+            'cache-payload': matchedCacheResponse.payload.replace(/[^\x00-\xff]+/g, ''),
         },
     });
 };
