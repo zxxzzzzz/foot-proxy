@@ -72,5 +72,5 @@ const pipe = async (
 };
 
 export const data = (_event: string, content: string, callback: (_: null, res: Response) => void) => {
-  pipe(_event, content, callback, [handleStatic, handleLogin, handleLogout, handleGetMe, handleDeletePut, handleOtherApi]);
+  pipe(_event, content, callback, [handleStatic, handleLogin, handleLogout, handleGetMe, handleSetting, handleDeletePut, handleOtherApi]);
 };

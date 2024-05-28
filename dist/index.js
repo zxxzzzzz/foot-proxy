@@ -65,6 +65,6 @@ const pipe = async (event, context, callback, funcList) => {
     });
 };
 const data = (_event, content, callback) => {
-    pipe(_event, content, callback, [server_1.handleStatic, server_1.handleLogin, server_1.handleLogout, server_1.handleGetMe, server_1.handleDeletePut, server_1.handleOtherApi]);
+    pipe(_event, content, callback, [server_1.handleStatic, server_1.handleLogin, server_1.handleLogout, server_1.handleGetMe, server_1.handleSetting, server_1.handleDeletePut, server_1.handleOtherApi]);
 };
 exports.data = data;
