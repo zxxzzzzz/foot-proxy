@@ -431,6 +431,8 @@ export const handleDeletePut = async (request: ParsedRequest, response: ParsedRe
 
   return false;
 };
+
+// 这个不缓存数据
 // http://proxy.fcv3.1048992591952509.cn-hangzhou.fc.devsapp.net/api/matchs/getMatchById?matchId=1025387&type=zq
 export const handleGetMatchById = async (request: ParsedRequest, response: ParsedResponse) => {
   const fullUrl = request.fullUrl;
