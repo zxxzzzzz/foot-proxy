@@ -200,7 +200,6 @@ const toFetch = async (request, matchAccount, op) => {
                 ...matchedCacheResponse.headers,
                 'is-cache': 'true',
                 'account-token': token,
-                'set-cookie': cookie_1.Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
             },
         });
     }
@@ -219,7 +218,7 @@ const toFetch = async (request, matchAccount, op) => {
     const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
     const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
     if (accountItem && isTokenExpired) {
-        return new Response('{"success":false,"error":"请重新登录"}', {
+        return new Response('{"success":false,"error":"请重新登录账号"}', {
             status: 400,
             statusText: 'error',
             headers: {
@@ -232,7 +231,7 @@ const toFetch = async (request, matchAccount, op) => {
             const res = await fetch(fullUrl, {
                 headers: {
                     ...request.headers,
-                    cookie: `session_id=${request.cookie.session_id}`,
+                    cookie: `session_id=${ossData.globalCookie.session_id}`,
                 },
                 body: ['get', 'head'].includes(request.method) ? null : request.body || null,
                 method: request.method,
@@ -290,7 +289,6 @@ const handleLogin = async (request, response) => {
     response.body = await res.text();
     response.isBase64Encoded = false;
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: loginData.account,
         token: res.headers.get('account-token') || '',
     };
@@ -318,7 +316,6 @@ const handleLogout = async (request, response) => {
     response.headers = toRecord(res.headers);
     response.setCookie = {
         account: request.cookie.account || '',
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
     };
     response.body = text;
     if (isValidAccount) {
@@ -340,7 +337,6 @@ const handleGetMe = async (request, response) => {
     });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: request.cookie.account || '',
         token: request.cookie.token || '',
     };
@@ -369,7 +365,6 @@ const handleSetting = async (request, response) => {
         });
         response.headers = toRecord(res.headers);
         response.setCookie = {
-            ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
             account: request.cookie.account || '',
             token: request.cookie.token || '',
         };
@@ -400,7 +395,6 @@ const handleSetting = async (request, response) => {
     });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: request.cookie.account || '',
         token: request.cookie.token || '',
     };
@@ -420,7 +414,6 @@ const handleOtherApi = async (request, response) => {
     });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: request.cookie.account || '',
         token: request.cookie.token || '',
     };
@@ -436,7 +429,6 @@ const handleDeletePut = async (request, response) => {
     const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: true, withCertification: true, isForce: false, maxCount: 10 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: request.cookie.account || '',
         token: request.cookie.token || '',
     };
@@ -453,7 +445,6 @@ const handleGetMatchById = async (request, response) => {
     const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: false, withCertification: true, isForce: true, maxCount: 1 });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-        ...cookie_1.Cookie.parseSetCookie(res.headers.getSetCookie()),
         account: request.cookie.account || '',
         token: request.cookie.token || '',
     };

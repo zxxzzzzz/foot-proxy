@@ -235,7 +235,6 @@ const toFetch = async (
         ...matchedCacheResponse.headers,
         'is-cache': 'true',
         'account-token': token,
-        'set-cookie': Cookie.stringifyToSetCookie('session_id', ossData.globalCookie.session_id),
       },
     });
   }
@@ -257,7 +256,7 @@ const toFetch = async (
   const accountItem = ossData.accountList.find((ac) => ac.account === request.cookie.account);
   const isTokenExpired = accountItem && accountItem.token !== request.cookie.token;
   if (accountItem && isTokenExpired) {
-    return new Response('{"success":false,"error":"请重新登录"}', {
+    return new Response('{"success":false,"error":"请重新登录账号"}', {
       status: 400,
       statusText: 'error',
       headers: {
@@ -270,7 +269,7 @@ const toFetch = async (
       const res = await fetch(fullUrl, {
         headers: {
           ...request.headers,
-          cookie: `session_id=${request.cookie.session_id}`,
+          cookie: `session_id=${ossData.globalCookie.session_id}`,
         },
         body: ['get', 'head'].includes(request.method) ? null : request.body || null,
         method: request.method,
@@ -327,7 +326,6 @@ export const handleLogin = async (request: ParsedRequest, response: ParsedRespon
   response.body = await res.text();
   response.isBase64Encoded = false;
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: loginData.account,
     token: res.headers.get('account-token') || '',
   };
@@ -355,7 +353,6 @@ export const handleLogout = async (request: ParsedRequest, response: ParsedRespo
   response.headers = toRecord(res.headers);
   response.setCookie = {
     account: request.cookie.account || '',
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
   };
   response.body = text;
   if (isValidAccount) {
@@ -376,7 +373,6 @@ export const handleGetMe = async (request: ParsedRequest, response: ParsedRespon
   });
   response.headers = toRecord(res.headers);
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: request.cookie.account || '',
     token: request.cookie.token || '',
   };
@@ -407,7 +403,6 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
     });
     response.headers = toRecord(res.headers);
     response.setCookie = {
-      ...Cookie.parseSetCookie(res.headers.getSetCookie()),
       account: request.cookie.account || '',
       token: request.cookie.token || '',
     };
@@ -442,7 +437,6 @@ export const handleSetting = async (request: ParsedRequest, response: ParsedResp
   });
   response.headers = toRecord(res.headers);
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: request.cookie.account || '',
     token: request.cookie.token || '',
   };
@@ -463,7 +457,6 @@ export const handleOtherApi = async (request: ParsedRequest, response: ParsedRes
   });
   response.headers = toRecord(res.headers);
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: request.cookie.account || '',
     token: request.cookie.token || '',
   };
@@ -478,7 +471,6 @@ export const handleDeletePut = async (request: ParsedRequest, response: ParsedRe
   const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: true, withCertification: true, isForce: false, maxCount: 10 });
   response.headers = toRecord(res.headers);
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: request.cookie.account || '',
     token: request.cookie.token || '',
   };
@@ -497,7 +489,6 @@ export const handleGetMatchById = async (request: ParsedRequest, response: Parse
   const res = await toFetch(request, '*', { maxAge: 1, needMatchPayload: false, withCertification: true, isForce: true, maxCount: 1 });
   response.headers = toRecord(res.headers);
   response.setCookie = {
-    ...Cookie.parseSetCookie(res.headers.getSetCookie()),
     account: request.cookie.account || '',
     token: request.cookie.token || '',
   };
