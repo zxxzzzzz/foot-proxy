@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.data = void 0;
 const server_1 = require("./server");
 const cookie_1 = require("./cookie");
-const DOMAIN = 'http://119.45.5.71';
+const DOMAIN = 'http://175.27.166.226';
 const pipe = async (event, context, callback, funcList) => {
     const request = JSON.parse(event.toString());
     const parsedResponse = {
