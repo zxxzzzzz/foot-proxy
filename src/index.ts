@@ -2,7 +2,7 @@ import { ParsedRequest, ParsedResponse, Request, Response } from './type';
 import { handleLogin, handleLogout, handleOtherApi, handleStatic, handleSetting, handleGetMe, handleDeletePut } from './server';
 import { Cookie } from './cookie';
 
-const DOMAIN = 'http://175.27.166.226';
+const DOMAIN = 'http://175.27.134.229';
 
 const pipe = async (
   event: string,

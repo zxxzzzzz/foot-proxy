@@ -456,7 +456,6 @@ const handleGetMatchById = async (request, response) => {
 exports.handleGetMatchById = handleGetMatchById;
 const handleStatic = async (request, response) => {
     const fullUrl = request.fullUrl;
-    console.log(fullUrl);
     const parsedUrl = new url_1.URL('', fullUrl);
     if (request.method !== 'get') {
         return true;
