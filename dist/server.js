@@ -486,7 +486,27 @@ const handleStatic = async (request, response) => {
     ];
     const matchedItem = extList.find((item) => fullUrl.endsWith(item.ext));
     if (matchedItem) {
-        if (['.js', '.css', '.woff'].includes(matchedItem.ext)) {
+        if (['.js'].includes(matchedItem.ext)) {
+            const res = await toFetch(request, '*', {
+                withCertification: false,
+                needMatchPayload: true,
+                maxAge: 10 * 1000,
+                isForce: false,
+                maxCount: 10,
+            });
+            response.statusCode = res.status;
+            response.headers = toRecord(res.headers);
+            response.isBase64Encoded = matchedItem.isBase64Encoded;
+            if (matchedItem.isBase64Encoded) {
+                const b = await res.arrayBuffer();
+                response.body = Buffer.from(b).toString('base64');
+                return false;
+            }
+            response.body = await res.text();
+            response.body = response.body.replace(/http:\/\/(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g, '');
+            return false;
+        }
+        if (['.css', '.woff'].includes(matchedItem.ext)) {
             const res = await toFetch(request, '*', {
                 withCertification: false,
                 needMatchPayload: true,
