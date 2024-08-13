@@ -548,7 +548,7 @@ export const handleStatic = async (request: ParsedRequest, response: ParsedRespo
         return false;
       }
       response.body = await res.text();
-      response.body = response.body.replace(/http:\/\/(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g, '')
+      response.body = response.body.replace(/http:\/\/(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/api/g, '/api')
       return false;
     }
     if (['.css', '.woff'].includes(matchedItem.ext)) {
